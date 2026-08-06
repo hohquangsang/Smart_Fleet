@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import * as driverController from './driver.controller.js';
+import auth from '../../middlewares/auth.middleware.js';
+import authorize from '../../middlewares/role.middleware.js';
+import validate from '../../middlewares/validate.middleware.js';
+import { toggleStatusSchema } from './driver.validation.js';
+import { ROLES } from '../../utils/constants.js';
+
+const router = Router();
+
+router.use(auth);
+router.use(authorize(ROLES.DRIVER));
+
+router.get('/me', driverController.getProfile);
+router.patch('/status', validate(toggleStatusSchema), driverController.toggleStatus);
+
+export default router;

@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole
+  fullName     String   @map("full_name") @db.VarChar(100)
+  phoneNumber  String   @unique @map("phone_number") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  driver         Driver?   @relation("UserDriver")
+  customerOrders Order[]   @relation("CustomerOrders")
+  approvedDrivers Driver[] @relation("ApprovedByAdmin")
+
+  @@map("users")
+}
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  ADMIN
+
+  @@map("user_role")
+}
+
+// ─── Drivers ─────────────────────────────────────────────
+model Driver {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String         @unique @map("user_id") @db.Uuid
+  vehicleType    String         @map("vehicle_type") @db.VarChar(50)
+  licensePlate   String         @unique @map("license_plate") @db.VarChar(20)
+  rating         Decimal        @default(5.00) @db.Decimal(3, 2)
+  isActive       Boolean        @default(true) @map("is_active")
+  approvalStatus ApprovalStatus @default(PENDING) @map("approval_status")
+  approvedBy     String?        @map("approved_by") @db.Uuid
+  approvedAt     DateTime?      @map("approved_at") @db.Timestamptz()
+
+  // Relations
+  user              User                    @relation("UserDriver", fields: [userId], references: [id], onDelete: Cascade)
+  approvedByAdmin   User?                   @relation("ApprovedByAdmin", fields: [approvedBy], references: [id])
+  orders            Order[]                 @relation("DriverOrders")
+  locationHistories DriverLocationHistory[] @relation("DriverLocations")
+
+  @@map("drivers")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("approval_status")
+}
+
+// ─── Orders ──────────────────────────────────────────────
+model Order {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId     String      @map("customer_id") @db.Uuid
+  driverId       String?     @map("driver_id") @db.Uuid
+  status         OrderStatus @default(PENDING)
+  pickupAddress  String      @map("pickup_address")
+  pickupLat      Float       @map("pickup_lat") @db.DoublePrecision
+  pickupLng      Float       @map("pickup_lng") @db.DoublePrecision
+  dropoffAddress String      @map("dropoff_address")
+  dropoffLat     Float       @map("dropoff_lat") @db.DoublePrecision
+  dropoffLng     Float       @map("dropoff_lng") @db.DoublePrecision
+  totalFare      Decimal     @map("total_fare") @db.Decimal(12, 2)
+  distanceKm     Decimal     @map("distance_km") @db.Decimal(6, 2)
+  baseEtaMin     Int         @map("base_eta_min")
+  aiEtaMin       Int?        @map("ai_eta_min")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  customer          User                    @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Cascade)
+  driver            Driver?                 @relation("DriverOrders", fields: [driverId], references: [id], onDelete: SetNull)
+  invoice           Invoice?                @relation("OrderInvoice")
+  locationHistories DriverLocationHistory[] @relation("OrderLocations")
+
+  @@index([customerId, status], name: "idx_orders_status_customer")
+  @@index([status], name: "idx_orders_pending")
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  MATCHED
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+
+  @@map("order_status")
+}
+
+// ─── Driver Location History ─────────────────────────────
+model DriverLocationHistory {
+  id        BigInt   @id @default(autoincrement())
+  driverId  String   @map("driver_id") @db.Uuid
+  orderId   String?  @map("order_id") @db.Uuid
+  latitude  Float    @db.DoublePrecision
+  longitude Float    @db.DoublePrecision
+  speed     Decimal? @db.Decimal(5, 2)
+  heading   Decimal? @db.Decimal(5, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  driver Driver @relation("DriverLocations", fields: [driverId], references: [id], onDelete: Cascade)
+  order  Order? @relation("OrderLocations", fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([driverId, createdAt(sort: Desc)], name: "idx_driver_loc_history")
+  @@map("driver_locations_history")
+}
+
+// ─── Invoices ────────────────────────────────────────────
+model Invoice {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @unique @map("order_id") @db.Uuid
+  invoiceNumber String   @unique @map("invoice_number") @db.VarChar(50)
+  customerName  String   @map("customer_name") @db.VarChar(100)
+  customerEmail String   @map("customer_email") @db.VarChar(255)
+  pickupAddress String   @map("pickup_address")
+  dropoffAddress String  @map("dropoff_address")
+  distanceKm    Decimal  @map("distance_km") @db.Decimal(6, 2)
+  baseFare      Decimal  @map("base_fare") @db.Decimal(12, 2)
+  totalFare     Decimal  @map("total_fare") @db.Decimal(12, 2)
+  pdfUrl        String?  @map("pdf_url")
+  issuedAt      DateTime @default(now()) @map("issued_at") @db.Timestamptz()
+
+  // Relations
+  order Order @relation("OrderInvoice", fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId], name: "idx_invoices_order")
+  @@map("invoices")
+}
