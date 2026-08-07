@@ -8,21 +8,31 @@ import { AppError } from '../utils/api-error.js';
 const errorMiddleware = (err, _req, res, _next) => {
   // Default values
   let statusCode = err.statusCode || 500;
-  let message = err.message || 'Internal server error';
+  let message = err.message || 'Lỗi máy chủ nội bộ';
+  let details = err.details || null;
   let isOperational = err.isOperational || false;
 
   // Prisma unique constraint violation
   if (err.code === 'P2002') {
     statusCode = 409;
-    const field = err.meta?.target?.join(', ') || 'field';
-    message = `Duplicate value for: ${field}`;
+    const target = err.meta?.target;
+    const targetStr = Array.isArray(target) ? target.join(', ') : String(target || '');
+    if (targetStr.includes('email')) {
+      message = 'Email này đã được đăng ký trên hệ thống.';
+    } else if (targetStr.includes('phone')) {
+      message = 'Số điện thoại này đã được đăng ký trên hệ thống.';
+    } else if (targetStr.includes('license')) {
+      message = 'Biển số xe này đã được đăng ký trên hệ thống.';
+    } else {
+      message = `Dữ liệu đã tồn tại: ${targetStr}`;
+    }
     isOperational = true;
   }
 
   // Prisma record not found
   if (err.code === 'P2025') {
     statusCode = 404;
-    message = 'Record not found';
+    message = 'Không tìm thấy dữ liệu yêu cầu';
     isOperational = true;
   }
 
@@ -35,6 +45,7 @@ const errorMiddleware = (err, _req, res, _next) => {
     success: false,
     error: {
       message,
+      ...(details && { details }),
       ...(process.env.NODE_ENV === 'development' && {
         stack: err.stack,
       }),

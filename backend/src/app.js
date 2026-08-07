@@ -11,8 +11,8 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'development'
-    ? ['http://localhost:5173', 'http://localhost:3000']
-    : [],
+    ? true
+    : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
 }));
 

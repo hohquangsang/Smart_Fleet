@@ -32,7 +32,25 @@ export const register = async (data) => {
   // Check existing email
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    throw new ConflictError('Email already registered');
+    throw new ConflictError('Email này đã được đăng ký');
+  }
+
+  // Check existing phone number
+  const existingPhone = await prisma.user.findUnique({ where: { phoneNumber } });
+  if (existingPhone) {
+    throw new ConflictError('Số điện thoại này đã được đăng ký');
+  }
+
+  // If registering as DRIVER, check vehicleType & licensePlate
+  if (role === ROLES.DRIVER) {
+    if (!vehicleType || !licensePlate) {
+      throw new BadRequestError('Loại xe và biển số xe là bắt buộc đối với Tài xế');
+    }
+
+    const existingPlate = await prisma.driver.findUnique({ where: { licensePlate } });
+    if (existingPlate) {
+      throw new ConflictError('Biển số xe này đã được đăng ký');
+    }
   }
 
   // Hash password
@@ -50,12 +68,7 @@ export const register = async (data) => {
       },
     });
 
-    // If registering as DRIVER, create driver profile
     if (role === ROLES.DRIVER) {
-      if (!vehicleType || !licensePlate) {
-        throw new BadRequestError('vehicleType and licensePlate are required for drivers');
-      }
-
       await tx.driver.create({
         data: {
           userId: newUser.id,
@@ -95,12 +108,12 @@ export const login = async ({ email, password }) => {
   });
 
   if (!user) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
   }
 
   const tokens = generateTokens(user);

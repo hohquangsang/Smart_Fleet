@@ -1,0 +1,483 @@
+/* ─── SmartFleet Driver UI Design Tokens & Styles ─────────── */
+
+.driver-container {
+  padding: 1.5rem;
+  background-color: var(--bg-primary);
+  min-height: calc(100vh - var(--topbar-height));
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.driver-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.driver-title {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ─── Online / Offline Toggle Switch ────────────────────────── */
+.online-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 10px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.online-switch {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  border-radius: 16px;
+  background: #262E3C;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  border: none;
+  padding: 0;
+}
+
+.online-switch--on {
+  background: var(--accent-green);
+  box-shadow: 0 0 16px rgba(51, 214, 159, 0.4);
+}
+
+.online-switch--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.online-switch-handle {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.online-switch--on .online-switch-handle {
+  transform: translateX(28px);
+}
+
+.approval-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.775rem;
+  font-weight: 600;
+}
+
+.approval-badge--approved {
+  background: rgba(51, 214, 159, 0.15);
+  border: 1px solid rgba(51, 214, 159, 0.3);
+  color: var(--accent-green);
+}
+
+.approval-badge--pending {
+  background: rgba(245, 166, 35, 0.15);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  color: #F5A623;
+}
+
+/* ─── Màn hình 1: Dashboard Layout ───────────────────────────── */
+.dashboard-driver-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.5rem;
+  min-height: calc(100vh - var(--topbar-height) - 5rem);
+}
+
+.driver-heatmap-wrapper {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 500px;
+}
+
+.heatmap-chip-floating {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(16, 20, 29, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  color: #EEF1F6;
+  font-size: 0.85rem;
+}
+
+/* Thẻ thu nhập nhanh */
+.quick-earnings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 1.5rem;
+  height: fit-content;
+}
+
+.quick-earnings-amount {
+  font-family: var(--font-mono);
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  margin-top: 4px;
+}
+
+.earnings-breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.earnings-sub-box {
+  background: var(--bg-panel-sub);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.earnings-sub-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/* ─── Màn hình 2: Dispatch Bottom Sheet ─────────────────────── */
+.dispatch-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 13, 19, 0.78);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.dispatch-bottom-sheet {
+  width: 540px;
+  max-width: 95vw;
+  background: #10141D;
+  border: 1px solid var(--border-primary);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  padding: 1.75rem;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.dispatch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.new-order-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(245, 166, 35, 0.18);
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  border-radius: 12px;
+  color: #F5A623;
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  animation: pulseOrange 1.2s infinite;
+}
+
+@keyframes pulseOrange {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.96); }
+}
+
+/* Vòng tròn đếm ngược SVG */
+.countdown-ring-container {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-ring-text {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  position: absolute;
+}
+
+/* Cước phí thực nhận nổi bật nhất */
+.dispatch-fare-highlight {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 12px;
+}
+
+.dispatch-fare-amount {
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  line-height: 1;
+}
+
+/* Swipe To Accept Track */
+.swipe-track {
+  position: relative;
+  height: 56px;
+  background: #171D29;
+  border: 1px solid var(--border-primary);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  overflow: hidden;
+}
+
+.swipe-text {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.swipe-handle {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  cursor: grab;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: transform 0.05s ease-out;
+  touch-action: none;
+}
+
+.swipe-handle:active {
+  cursor: grabbing;
+}
+
+.btn-skip-order {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.btn-skip-order:hover {
+  color: var(--accent-red);
+}
+
+/* ─── Màn hình 3: Active Trip Execution ──────────────────────── */
+.active-trip-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.5rem;
+  min-height: calc(100vh - var(--topbar-height) - 5rem);
+}
+
+.step-action-button {
+  width: 100%;
+  padding: 1.1rem;
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  color: #FFFFFF;
+}
+
+.step-action-button--blue {
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.step-action-button--green {
+  background: linear-gradient(135deg, #33D69F 0%, #059669 100%);
+  box-shadow: 0 0 20px rgba(51, 214, 159, 0.4);
+}
+
+.btn-incident {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(240, 87, 107, 0.1);
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-body);
+}
+
+.btn-incident:hover {
+  background: var(--accent-red);
+  color: #FFFFFF;
+}
+
+/* ─── Màn hình 4: Earnings & Profile ────────────────────────── */
+.earnings-tabs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.tab-pill-group {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-pill {
+  padding: 6px 16px;
+  background: var(--bg-panel-sub);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tab-pill--active {
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  border-color: var(--accent-blue);
+}
+
+.earnings-overview-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.stat-overview-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-overview-val {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gauges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.gauge-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gauge-bar-track {
+  height: 8px;
+  background: var(--bg-panel-sub);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gauge-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* Responsive Rules */
+@media (max-width: 992px) {
+  .dashboard-driver-layout,
+  .active-trip-layout {
+    grid-template-columns: 1fr;
+  }
+  .earnings-overview-cards,
+  .gauges-grid {
+    grid-template-columns: 1fr;
+  }
+  .dispatch-bottom-sheet {
+    width: 100vw;
+    max-width: 100vw;
+  }
+}

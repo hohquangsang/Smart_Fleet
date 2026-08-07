@@ -1,37 +1,39 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import LoginPage from '../pages/auth/LoginPage';
-import RegisterPage from '../pages/auth/RegisterPage';
+import AuthPage from '../pages/auth/AuthPage';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import DriversPage from '../pages/admin/DriversPage';
+import UsersPage from '../pages/admin/UsersPage';
 import OrdersPage from '../pages/admin/OrdersPage';
 import LiveFleetPage from '../pages/admin/LiveFleetPage';
 import AnalyticsPage from '../pages/admin/AnalyticsPage';
 import AlertsPage from '../pages/admin/AlertsPage';
 import CreateOrderPage from '../pages/customer/CreateOrderPage';
-import MyOrdersPage from '../pages/customer/MyOrdersPage';
-import InvoicesPage from '../pages/customer/InvoicesPage';
+import CustomerTrackingPage from '../pages/customer/CustomerTrackingPage';
+import CustomerHistoryPage from '../pages/customer/CustomerHistoryPage';
 import DriverDashboard from '../pages/driver/DriverDashboard';
-import AvailableOrders from '../pages/driver/AvailableOrders';
-import OrderHistory from '../pages/driver/OrderHistory';
+import DriverDispatchPage from '../pages/driver/DriverDispatchPage';
+import ActiveTripPage from '../pages/driver/ActiveTripPage';
+import EarningsProfilePage from '../pages/driver/EarningsProfilePage';
 import { ProtectedRoute } from './ProtectedRoute';
 
 export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
+  { path: '/login', element: <AuthPage /> },
+  { path: '/register', element: <AuthPage /> },
 
   // Admin Routes
   {
     path: '/admin',
     element: (
       <ProtectedRoute allowedRoles={['ADMIN']}>
-        <DashboardLayout title="Operations Dashboard" />
+        <DashboardLayout title="SmartFleet Admin Console" />
       </ProtectedRoute>
     ),
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'drivers', element: <DriversPage /> },
+      { path: 'users', element: <UsersPage /> },
       { path: 'orders', element: <OrdersPage /> },
       { path: 'tracking', element: <LiveFleetPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
@@ -44,13 +46,15 @@ export const router = createBrowserRouter([
     path: '/customer',
     element: (
       <ProtectedRoute allowedRoles={['CUSTOMER']}>
-        <DashboardLayout title="Customer Dashboard" />
+        <DashboardLayout title="SmartFleet Khách Hàng" />
       </ProtectedRoute>
     ),
     children: [
       { index: true, element: <CreateOrderPage /> },
-      { path: 'orders', element: <MyOrdersPage /> },
-      { path: 'invoices', element: <InvoicesPage /> },
+      { path: 'tracking', element: <CustomerTrackingPage /> },
+      { path: 'history', element: <CustomerHistoryPage /> },
+      { path: 'orders', element: <Navigate to="/customer/history" replace /> },
+      { path: 'invoices', element: <Navigate to="/customer/history" replace /> },
     ],
   },
 
@@ -59,13 +63,16 @@ export const router = createBrowserRouter([
     path: '/driver',
     element: (
       <ProtectedRoute allowedRoles={['DRIVER']}>
-        <DashboardLayout title="Driver Desk" />
+        <DashboardLayout title="SmartFleet Bàn Làm Việc Tài Xế" />
       </ProtectedRoute>
     ),
     children: [
       { index: true, element: <DriverDashboard /> },
-      { path: 'available', element: <AvailableOrders /> },
-      { path: 'history', element: <OrderHistory /> },
+      { path: 'dispatch', element: <DriverDispatchPage /> },
+      { path: 'active', element: <ActiveTripPage /> },
+      { path: 'earnings', element: <EarningsProfilePage /> },
+      { path: 'available', element: <Navigate to="/driver/dispatch" replace /> },
+      { path: 'history', element: <Navigate to="/driver/earnings" replace /> },
     ],
   },
 

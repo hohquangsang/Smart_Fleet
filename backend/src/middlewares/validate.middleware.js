@@ -21,7 +21,8 @@ const validate = (schema, source = 'body') => {
         message: issue.message,
       }));
 
-      return next(new BadRequestError(JSON.stringify(errors)));
+      const firstMsg = errors[0]?.message || 'Dữ liệu không hợp lệ';
+      return next(new BadRequestError(firstMsg, errors));
     }
 
     // Replace with parsed/coerced data

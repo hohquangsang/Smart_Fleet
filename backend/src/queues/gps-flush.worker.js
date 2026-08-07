@@ -10,29 +10,39 @@ export const gpsFlushQueue = new Queue(QUEUE_NAMES.GPS_FLUSH, {
   connection: createRedisConnection(),
 });
 
-/**
- * Initialize the repeatable GPS flush job.
- * Runs every GPS_FLUSH_INTERVAL_SEC seconds.
- */
-export const initGpsFlushJob = async () => {
-  // Remove any existing repeatable jobs
-  const existing = await gpsFlushQueue.getRepeatableJobs();
-  for (const job of existing) {
-    await gpsFlushQueue.removeRepeatableByKey(job.key);
-  }
 
-  // Add new repeatable job
-  await gpsFlushQueue.add(
-    'flush',
-    {},
-    {
-      repeat: {
-        every: (parseInt(process.env.GPS_FLUSH_INTERVAL_SEC) || 60) * 1000,
-      },
-      removeOnComplete: { count: 5 },
-      removeOnFail: { count: 5 },
+export const initGpsFlushJob = async () => {
+  const intervalMs = (parseInt(process.env.GPS_FLUSH_INTERVAL_SEC) || 60) * 1000;
+
+  // BullMQ v5+ Job Scheduler API
+  if (typeof gpsFlushQueue.upsertJobScheduler === 'function') {
+    await gpsFlushQueue.upsertJobScheduler(
+      'gps-flush-job',
+      { every: intervalMs },
+      {
+        name: 'flush',
+        data: {},
+        opts: {
+          removeOnComplete: { count: 5 },
+          removeOnFail: { count: 5 },
+        },
+      }
+    );
+  } else if (typeof gpsFlushQueue.getRepeatableJobs === 'function') {
+    const existing = await gpsFlushQueue.getRepeatableJobs();
+    for (const job of existing) {
+      await gpsFlushQueue.removeRepeatableByKey(job.key);
     }
-  );
+    await gpsFlushQueue.add(
+      'flush',
+      {},
+      {
+        repeat: { every: intervalMs },
+        removeOnComplete: { count: 5 },
+        removeOnFail: { count: 5 },
+      }
+    );
+  }
 
   console.log('🛰️  GPS flush repeatable job initialized');
 };

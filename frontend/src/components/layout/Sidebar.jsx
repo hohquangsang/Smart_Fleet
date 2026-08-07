@@ -1,33 +1,39 @@
 import { NavLink } from 'react-router-dom';
-import { HiOutlineViewGrid, HiOutlineMap, HiOutlineTruck, HiOutlineUsers, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineBell, HiOutlineShoppingCart, HiOutlineClock, HiOutlineLogout } from 'react-icons/hi';
+import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout } from 'react-icons/hi';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/sidebar.css';
 
-const adminNavItems = [
-  { path: '/admin', label: 'Operations Dashboard', icon: <HiOutlineViewGrid /> },
-  { path: '/admin/tracking', label: 'Live Fleet Monitor', icon: <HiOutlineMap /> },
-  { path: '/admin/orders', label: 'Order & Dispatch', icon: <HiOutlineTruck /> },
-  { path: '/admin/drivers', label: 'Fleet Management', icon: <HiOutlineUsers /> },
-  { path: '/admin/analytics', label: 'Data Analytics', icon: <HiOutlineChartBar /> },
-  { path: '/admin/alerts', label: 'System Alerts', icon: <HiOutlineBell /> },
+const adminNavGroups = [
+  {
+    groupTitle: null,
+    items: [
+      { path: '/admin', label: 'Tổng quan', icon: <HiOutlineViewGrid /> },
+    ],
+  },
+  {
+    groupTitle: 'QUẢN LÝ',
+    items: [
+      { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers />, badge: '3', badgeColor: '#F5A623' },
+      { path: '/admin/users', label: 'Người dùng', icon: <HiOutlineUserGroup /> },
+    ],
+  },
 ];
 
 const customerNavItems = [
-  { path: '/customer', label: 'Create Order', icon: <HiOutlineShoppingCart /> },
-  { path: '/customer/orders', label: 'My Orders', icon: <HiOutlineTruck /> },
-  { path: '/customer/invoices', label: 'Invoices', icon: <HiOutlineDocumentText /> },
+  { path: '/customer', label: 'Đặt đơn & Tính cước', icon: <HiOutlineShoppingCart /> },
+  { path: '/customer/tracking', label: 'Theo dõi Real-time', icon: <HiOutlineMap /> },
+  { path: '/customer/history', label: 'Lịch sử & Hóa đơn', icon: <HiOutlineDocumentText /> },
 ];
 
 const driverNavItems = [
-  { path: '/driver', label: 'Dashboard', icon: <HiOutlineViewGrid /> },
-  { path: '/driver/available', label: 'Available Orders', icon: <HiOutlineTruck /> },
-  { path: '/driver/history', label: 'Order History', icon: <HiOutlineClock /> },
+  { path: '/driver', label: 'Tổng quan & Trạng thái', icon: <HiOutlineViewGrid /> },
+  { path: '/driver/dispatch', label: 'Nhận đơn Real-time', icon: <HiOutlineTruck /> },
+  { path: '/driver/active', label: 'Đang giao hàng', icon: <HiOutlineMap /> },
+  { path: '/driver/earnings', label: 'Thu nhập & Hiệu suất', icon: <HiOutlineChartBar /> },
 ];
 
 const Sidebar = () => {
   const { user, logout, isAdmin, isDriver } = useAuth();
-
-  const navItems = isAdmin ? adminNavItems : isDriver ? driverNavItems : customerNavItems;
 
   const initials = user?.fullName
     ?.split(' ')
@@ -46,20 +52,61 @@ const Sidebar = () => {
       </div>
 
       <nav className="sidebar__nav">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === '/admin' || item.path === '/customer' || item.path === '/driver'}
-            className={({ isActive }) =>
-              `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
-            }
-          >
-            <span className="sidebar__nav-icon">{item.icon}</span>
-            <span className="sidebar__nav-label">{item.label}</span>
-            {item.badge && <span className="sidebar__badge">{item.badge}</span>}
-          </NavLink>
-        ))}
+        {isAdmin ? (
+          adminNavGroups.map((grp, gIdx) => (
+            <div key={gIdx} style={{ marginBottom: 14 }}>
+              {grp.groupTitle && (
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    padding: '4px 12px',
+                    letterSpacing: '0.8px',
+                  }}
+                >
+                  {grp.groupTitle}
+                </div>
+              )}
+              {grp.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/admin'}
+                  className={({ isActive }) =>
+                    `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
+                  }
+                >
+                  <span className="sidebar__nav-icon">{item.icon}</span>
+                  <span className="sidebar__nav-label">{item.label}</span>
+                  {item.badge && (
+                    <span
+                      className="sidebar__badge"
+                      style={{ background: item.badgeColor || 'var(--accent-red)' }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          ))
+        ) : (
+          (isDriver ? driverNavItems : customerNavItems).map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/customer' || item.path === '/driver'}
+              className={({ isActive }) =>
+                `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
+              }
+            >
+              <span className="sidebar__nav-icon">{item.icon}</span>
+              <span className="sidebar__nav-label">{item.label}</span>
+              {item.badge && <span className="sidebar__badge">{item.badge}</span>}
+            </NavLink>
+          ))
+        )}
       </nav>
 
       <div className="sidebar__footer">

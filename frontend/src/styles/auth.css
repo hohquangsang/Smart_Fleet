@@ -1,0 +1,690 @@
+/* ─── Fonts ───────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ─── Auth Design Tokens ─────────────────────── */
+:root {
+  --auth-bg: #0A0D13;
+  --auth-panel: #10141D;
+  --auth-panel-alt: #171D29;
+  --auth-border: #262E3C;
+  --auth-text: #EEF1F6;
+  --auth-text-sub: #8B93A6;
+  --auth-amber: #F5A623;
+  --auth-amber-dark: #D48E1A;
+  --auth-amber-glow: rgba(245, 166, 35, 0.25);
+  --auth-blue: #3B82F6;
+  --auth-blue-dark: #2563EB;
+  --auth-blue-glow: rgba(59, 130, 246, 0.3);
+  --auth-green: #33D69F;
+  --auth-green-glow: rgba(51, 214, 159, 0.25);
+  --auth-red: #E74C5E;
+  --auth-radius: 10px;
+  --auth-radius-sm: 8px;
+  --font-heading: 'Oswald', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Auth Shell ─────────────────────────────── */
+.auth-shell {
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  background: var(--auth-bg);
+  font-family: var(--font-body);
+  color: var(--auth-text);
+  overflow: hidden;
+}
+
+/* ─── Left Column — Dispatch Panel (2/6) ────── */
+.auth-dispatch {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(245, 166, 35, 0.04) 0%, transparent 60%),
+    var(--auth-bg);
+  border-right: 1px solid var(--auth-border);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* LIVE DISPATCH Badge */
+.dispatch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: rgba(51, 214, 159, 0.08);
+  border: 1px solid rgba(51, 214, 159, 0.2);
+  border-radius: 20px;
+  font-family: var(--font-heading);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--auth-green);
+  text-transform: uppercase;
+  width: fit-content;
+  margin-bottom: 0.75rem;
+}
+
+.dispatch-badge__dot {
+  width: 8px;
+  height: 8px;
+  background: var(--auth-green);
+  border-radius: 50%;
+  animation: badgePulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--auth-green-glow);
+}
+
+@keyframes badgePulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+
+/* ─── Map Container ──────────────────────────── */
+.dispatch-map {
+  flex: 1;
+  background: var(--auth-panel);
+  border: 1px solid var(--auth-border);
+  border-radius: var(--auth-radius);
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+.dispatch-map svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Grid lines */
+.map-grid-line {
+  stroke: #1A2030;
+  stroke-width: 0.5;
+}
+
+/* Route path */
+.map-route {
+  fill: none;
+  stroke: var(--auth-blue);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px var(--auth-blue-glow));
+}
+
+.map-route-trail {
+  fill: none;
+  stroke: rgba(59, 130, 246, 0.15);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Waypoints */
+.map-waypoint-ring {
+  fill: none;
+  stroke: var(--auth-blue);
+  stroke-width: 2;
+  opacity: 0.6;
+}
+
+.map-waypoint-dot {
+  fill: var(--auth-panel);
+  stroke: var(--auth-blue);
+  stroke-width: 2;
+}
+
+/* Destination */
+.map-destination-outer {
+  fill: rgba(51, 214, 159, 0.18);
+  animation: destPulse 2s ease-in-out infinite;
+}
+
+.map-destination-inner {
+  fill: var(--auth-green);
+  filter: drop-shadow(0 0 8px var(--auth-green-glow));
+}
+
+@keyframes destPulse {
+
+  0%,
+  100% {
+    r: 14;
+    opacity: 0.3;
+  }
+
+  50% {
+    r: 20;
+    opacity: 0.08;
+  }
+}
+
+/* Vehicle dot */
+.map-vehicle {
+  fill: var(--auth-blue);
+  filter: drop-shadow(0 0 10px var(--auth-blue-glow));
+}
+
+.map-vehicle-glow {
+  fill: rgba(59, 130, 246, 0.2);
+  animation: vehicleGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes vehicleGlow {
+
+  0%,
+  100% {
+    r: 10;
+    opacity: 0.3;
+  }
+
+  50% {
+    r: 16;
+    opacity: 0.08;
+  }
+}
+
+/* Labels on map */
+.map-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--auth-text-sub);
+  letter-spacing: 0.5px;
+}
+
+.map-label-bg {
+  fill: var(--auth-panel);
+  stroke: var(--auth-border);
+  stroke-width: 1;
+  rx: 4;
+}
+
+/* ─── Telemetry Gauges ───────────────────────── */
+.dispatch-telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 0.75rem;
+  flex-shrink: 0;
+}
+
+.telemetry-card {
+  background: var(--auth-panel);
+  border: 1px solid var(--auth-border);
+  border-radius: var(--auth-radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.telemetry-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--auth-blue), transparent);
+  opacity: 0.5;
+}
+
+.telemetry-card__label {
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--auth-text-sub);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.telemetry-card__value {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--auth-text);
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.telemetry-card__unit {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--auth-text-sub);
+}
+
+.telemetry-card--online .telemetry-card__value {
+  color: var(--auth-green);
+}
+
+.telemetry-card--online::before {
+  background: linear-gradient(90deg, transparent, var(--auth-green), transparent);
+}
+
+/* ─── SmartFleet Branding (left) ─────────────── */
+.dispatch-branding {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dispatch-branding__icon {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, var(--auth-blue), var(--auth-blue-dark));
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.dispatch-branding__text {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--auth-text);
+}
+
+.dispatch-branding__sub {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  color: var(--auth-text-sub);
+  margin-top: 1px;
+}
+
+/* ─── Right Column — Form Panel (4/6) ────────── */
+.auth-form-panel {
+  flex: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 3rem;
+  background: var(--auth-panel);
+  position: relative;
+  height: 100vh;
+  overflow-y: auto;
+  max-width: 680px;
+}
+
+/* ─── Tab Switcher ───────────────────────────── */
+.auth-tabs {
+  display: flex;
+  background: var(--auth-bg);
+  border-radius: var(--auth-radius-sm);
+  padding: 4px;
+  margin-bottom: 2rem;
+  border: 1px solid var(--auth-border);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--auth-text-sub);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: transparent;
+  border: none;
+  position: relative;
+}
+
+.auth-tab:hover {
+  color: var(--auth-text);
+}
+
+.auth-tab--active {
+  background: var(--auth-panel-alt);
+  color: var(--auth-blue);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Form Header ────────────────────────────── */
+.auth-form-header {
+  margin-bottom: 1.75rem;
+}
+
+.auth-form-header__title {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--auth-text);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.auth-form-header__subtitle {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--auth-text-sub);
+  line-height: 1.5;
+}
+
+/* ─── Form Fields ────────────────────────────── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field__label {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--auth-text-sub);
+  letter-spacing: 0.3px;
+}
+
+.auth-field__input {
+  padding: 0.8rem 1rem;
+  background: var(--auth-bg);
+  border: 1px solid var(--auth-border);
+  border-radius: var(--auth-radius-sm);
+  color: var(--auth-text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.auth-field__input::placeholder {
+  color: #4A5268;
+}
+
+.auth-field__input:focus {
+  border-color: var(--auth-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+/* Focus outline for keyboard navigation */
+.auth-field__input:focus-visible {
+  border-color: var(--auth-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  outline: 2px solid var(--auth-blue);
+  outline-offset: 1px;
+}
+
+/* Select dropdown */
+.auth-field__select {
+  padding: 0.8rem 1rem;
+  background: var(--auth-bg);
+  border: 1px solid var(--auth-border);
+  border-radius: var(--auth-radius-sm);
+  color: var(--auth-text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238B93A6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.auth-field__select:focus {
+  border-color: var(--auth-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.auth-field__select:focus-visible {
+  border-color: var(--auth-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  outline: 2px solid var(--auth-blue);
+  outline-offset: 1px;
+}
+
+/* 2-column row */
+.auth-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ─── Submit Button ──────────────────────────── */
+.auth-submit {
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: none;
+  border-radius: var(--auth-radius-sm);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-submit:hover {
+  box-shadow: 0 4px 20px var(--auth-blue-glow), 0 0 40px rgba(59, 130, 246, 0.12);
+  transform: translateY(-1px);
+}
+
+.auth-submit:active {
+  transform: translateY(0);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.auth-submit:focus-visible {
+  outline: 2px solid var(--auth-blue);
+  outline-offset: 2px;
+}
+
+/* ─── Loading Spinner ────────────────────────── */
+.auth-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: authSpin 0.6s linear infinite;
+}
+
+@keyframes authSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Error Message ──────────────────────────── */
+.auth-error {
+  padding: 0.65rem 0.9rem;
+  background: rgba(231, 76, 94, 0.1);
+  border: 1px solid rgba(231, 76, 94, 0.25);
+  border-radius: var(--auth-radius-sm);
+  color: var(--auth-red);
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Footer Link ────────────────────────────── */
+.auth-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.88rem;
+  color: var(--auth-text-sub);
+  font-family: var(--font-body);
+}
+
+.auth-footer__link {
+  color: var(--auth-blue) !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  padding: 0;
+  text-decoration: none;
+}
+
+.auth-footer__link:hover {
+  color: #60A5FA !important;
+  text-decoration: underline;
+}
+
+/* ─── Driver Warning ─────────────────────────── */
+.auth-driver-notice {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--auth-radius-sm);
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.2);
+  color: var(--auth-amber);
+  line-height: 1.5;
+}
+
+/* ─── Form Transition ────────────────────────── */
+.auth-form-enter {
+  animation: authFormIn 0.3s ease forwards;
+}
+
+@keyframes authFormIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Mobile Strip (shown instead of full map) ─ */
+.auth-mobile-strip {
+  display: none;
+  background: var(--auth-panel);
+  border-bottom: 1px solid var(--auth-border);
+  padding: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-mobile-strip__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-mobile-strip__icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--auth-blue), var(--auth-blue-dark));
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.auth-mobile-strip__name {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: var(--auth-text);
+}
+
+/* ─── Responsive ─────────────────────────────── */
+@media (max-width: 1024px) {
+  .auth-dispatch {
+    display: none;
+  }
+
+  .auth-mobile-strip {
+    display: flex;
+  }
+
+  .auth-shell {
+    flex-direction: column;
+  }
+
+  .auth-form-panel {
+    width: 100%;
+    min-width: unset;
+    flex: 1;
+    padding: 2rem 1.5rem;
+    justify-content: flex-start;
+    padding-top: 2rem;
+  }
+
+  .auth-form-header__title {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-form-panel {
+    padding: 1.5rem 1rem;
+  }
+
+  .auth-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-tabs {
+    margin-bottom: 1.5rem;
+  }
+}
