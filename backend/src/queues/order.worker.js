@@ -4,91 +4,114 @@ import prisma from '../config/database.js';
 import { searchNearbyDrivers } from '../services/redis-geo.service.js';
 import redis from '../config/redis.js';
 import { getIO } from '../config/socket.js';
-import { QUEUE_NAMES, DRIVER_STATUS, REDIS_KEYS, APPROVAL_STATUS } from '../utils/constants.js';
+import { QUEUE_NAMES, DRIVER_STATUS, REDIS_KEYS, APPROVAL_STATUS, ORDER_STATUS, ACTOR_TYPE } from '../utils/constants.js';
 import env from '../config/env.js';
 
 /**
  * Order dispatch worker.
- * 1. GEOSEARCH nearby drivers
- * 2. Filter: approved + online + not on trip
- * 3. Emit 'new-order' to matched drivers via Socket.IO
+ * 1. Process 30s dispatch-timeout job -> EXPIRED_NO_DRIVER
+ * 2. Process dispatch job -> GEOSEARCH nearby drivers -> emit 'new-order'
  */
 const orderWorker = new Worker(
   QUEUE_NAMES.ORDER_DISPATCH,
   async (job) => {
-    const { orderId } = job.data;
-    console.log(`🚀 Processing dispatch for order: ${orderId}`);
+    if (job.name === 'dispatch-timeout') {
+      const { orderId } = job.data;
+      console.log(`⏰ Dispatch timeout check for order: ${orderId}`);
 
-    // 1. Fetch order details
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        customer: { select: { fullName: true, phoneNumber: true } },
-      },
-    });
+      const order = await prisma.order.findUnique({ where: { id: orderId } });
+      if (order && order.status === ORDER_STATUS.DISPATCHING) {
+        const { transitionOrderStatus } = await import('../modules/order/order-status.service.js');
+        const { emitCustomerOrderStatus } = await import('../sockets/socket.gateway.js');
 
-    if (!order || order.status !== 'PENDING') {
-      console.log(`⚠️  Order ${orderId} is no longer PENDING, skipping`);
-      return;
-    }
-
-    // 2. GEOSEARCH nearby drivers
-    const nearbyDrivers = await searchNearbyDrivers(
-      order.pickupLng,
-      order.pickupLat,
-      env.DISPATCH_RADIUS_KM
-    );
-
-    if (nearbyDrivers.length === 0) {
-      console.log(`⚠️  No nearby drivers found for order ${orderId}`);
-      return;
-    }
-
-    // 3. Filter: only APPROVED, ONLINE drivers
-    const eligibleDriverIds = [];
-    for (const { driverId } of nearbyDrivers) {
-      const status = await redis.get(REDIS_KEYS.DRIVER_STATUS(driverId));
-      if (status === DRIVER_STATUS.ONLINE) {
-        // Verify DB approval status
-        const driver = await prisma.driver.findUnique({
-          where: { id: driverId },
-          select: { approvalStatus: true, userId: true },
+        await transitionOrderStatus(orderId, ORDER_STATUS.EXPIRED_NO_DRIVER, {
+          actorType: ACTOR_TYPE.SYSTEM,
         });
-        if (driver && driver.approvalStatus === APPROVAL_STATUS.APPROVED) {
-          eligibleDriverIds.push({ driverId, userId: driver.userId });
+
+        emitCustomerOrderStatus(order.customerId, {
+          orderId,
+          status: ORDER_STATUS.EXPIRED_NO_DRIVER,
+          label: 'Hết thời gian tìm tài xế',
+        });
+
+        console.log(`⌛ Order ${orderId} expired with status EXPIRED_NO_DRIVER`);
+      }
+      return;
+    }
+
+    if (job.name === 'dispatch') {
+      const { orderId } = job.data;
+      console.log(`🚀 Processing dispatch for order: ${orderId}`);
+
+      // Fetch order details
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          customer: { select: { fullName: true, phoneNumber: true } },
+        },
+      });
+
+      if (!order || order.status !== 'PENDING') {
+        console.log(`⚠️  Order ${orderId} is no longer PENDING, skipping`);
+        return;
+      }
+
+      // GEOSEARCH nearby drivers
+      const nearbyDrivers = await searchNearbyDrivers(
+        order.pickupLng,
+        order.pickupLat,
+        env.DISPATCH_RADIUS_KM
+      );
+
+      if (nearbyDrivers.length === 0) {
+        console.log(`⚠️  No nearby drivers found for order ${orderId}`);
+        return;
+      }
+
+      // Filter: only APPROVED, ONLINE drivers
+      const eligibleDriverIds = [];
+      for (const { driverId } of nearbyDrivers) {
+        const status = await redis.get(REDIS_KEYS.DRIVER_STATUS(driverId));
+        if (status === DRIVER_STATUS.ONLINE) {
+          const driver = await prisma.driver.findUnique({
+            where: { id: driverId },
+            select: { approvalStatus: true, userId: true },
+          });
+          if (driver && driver.approvalStatus === APPROVAL_STATUS.APPROVED) {
+            eligibleDriverIds.push({ driverId, userId: driver.userId });
+          }
         }
       }
+
+      if (eligibleDriverIds.length === 0) {
+        console.log(`⚠️  No eligible drivers for order ${orderId}`);
+        return;
+      }
+
+      const io = getIO();
+      const driverNamespace = io.of('/driver');
+
+      const orderPayload = {
+        id: order.id,
+        pickupAddress: order.pickupAddress,
+        pickupLat: order.pickupLat,
+        pickupLng: order.pickupLng,
+        dropoffAddress: order.dropoffAddress,
+        dropoffLat: order.dropoffLat,
+        dropoffLng: order.dropoffLng,
+        totalFare: order.totalFare,
+        distanceKm: order.distanceKm,
+        baseEtaMin: order.baseEtaMin,
+        aiEtaMin: order.aiEtaMin,
+        customer: order.customer,
+      };
+
+      for (const { userId } of eligibleDriverIds) {
+        driverNamespace.to(`user:${userId}`).emit('new-order', orderPayload);
+      }
+
+      console.log(`✅ Dispatched order ${orderId} to ${eligibleDriverIds.length} drivers`);
     }
-
-    if (eligibleDriverIds.length === 0) {
-      console.log(`⚠️  No eligible drivers for order ${orderId}`);
-      return;
-    }
-
-    // 4. Emit to driver namespace
-    const io = getIO();
-    const driverNamespace = io.of('/driver');
-
-    const orderPayload = {
-      id: order.id,
-      pickupAddress: order.pickupAddress,
-      pickupLat: order.pickupLat,
-      pickupLng: order.pickupLng,
-      dropoffAddress: order.dropoffAddress,
-      dropoffLat: order.dropoffLat,
-      dropoffLng: order.dropoffLng,
-      totalFare: order.totalFare,
-      distanceKm: order.distanceKm,
-      baseEtaMin: order.baseEtaMin,
-      aiEtaMin: order.aiEtaMin,
-      customer: order.customer,
-    };
-
-    for (const { userId } of eligibleDriverIds) {
-      driverNamespace.to(`user:${userId}`).emit('new-order', orderPayload);
-    }
-
-    console.log(`✅ Dispatched order ${orderId} to ${eligibleDriverIds.length} drivers`);
   },
   {
     connection: createRedisConnection(),

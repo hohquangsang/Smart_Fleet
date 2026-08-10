@@ -19,3 +19,14 @@ export const toggleStatus = catchAsync(async (req, res) => {
     data: result,
   });
 });
+
+export const acceptOrder = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const order = await driverService.acceptOrder(req.user.id, id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Order accepted successfully',
+    data: { order },
+  });
+});

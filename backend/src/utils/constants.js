@@ -8,10 +8,23 @@ export const ROLES = {
 // ─── Order Statuses ──────────────────────────────────────
 export const ORDER_STATUS = {
   PENDING: 'PENDING',
+  DISPATCHING: 'DISPATCHING',
+  DRIVER_ACCEPTED: 'DRIVER_ACCEPTED',
   MATCHED: 'MATCHED',
+  IN_TRANSIT: 'IN_TRANSIT',
   PICKED_UP: 'PICKED_UP',
+  COMPLETED: 'COMPLETED',
   DELIVERED: 'DELIVERED',
   CANCELLED: 'CANCELLED',
+  EXPIRED_NO_DRIVER: 'EXPIRED_NO_DRIVER',
+};
+
+// ─── Actor Types for Audit History ──────────────────────
+export const ACTOR_TYPE = {
+  CUSTOMER: 'CUSTOMER',
+  ADMIN: 'ADMIN',
+  DRIVER: 'DRIVER',
+  SYSTEM: 'SYSTEM',
 };
 
 // ─── Driver Approval ─────────────────────────────────────
@@ -30,10 +43,9 @@ export const DRIVER_STATUS = {
 
 // ─── Fare Rates (VND per km based on vehicle type) ──────
 export const FARE_RATES = {
-  motorcycle: { baseFare: 15000, perKm: 5000, minFare: 20000 },
-  car: { baseFare: 25000, perKm: 10000, minFare: 30000 },
-  van: { baseFare: 35000, perKm: 15000, minFare: 50000 },
-  truck: { baseFare: 50000, perKm: 20000, minFare: 80000 },
+  motorcycle: { name: 'Xe máy', baseFare: 0, perKm: 10000, minFare: 10000 },
+  car_4: { name: 'Ô tô 4 chỗ', baseFare: 0, perKm: 12000, minFare: 12000 },
+  car_7: { name: 'Ô tô 7 chỗ', baseFare: 0, perKm: 15000, minFare: 15000 },
 };
 
 // ─── Redis Key Patterns ─────────────────────────────────
@@ -41,9 +53,11 @@ export const REDIS_KEYS = {
   DRIVER_LOCATIONS: 'drivers:locations',
   DRIVER_LOCATION: (id) => `driver:${id}:location`,
   DRIVER_STATUS: (id) => `driver:${id}:status`,
+  DRIVERS_ONLINE_VEHICLE: (vehicleType) => `drivers:online:${vehicleType || 'motorcycle'}`,
   GPS_BUFFER: (id) => `gps-buffer:${id}`,
   ROUTE_CACHE: (key) => `route:${key}`,
-  ORDER_LOCK: (id) => `order-lock:${id}`,
+  ORDER_LOCK: (id) => `order:${id}:lock`,
+  DISPATCH_DEADLINE: (id) => `order:${id}:dispatch_deadline`,
 };
 
 // ─── Queue Names ─────────────────────────────────────────

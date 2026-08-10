@@ -1,6 +1,6 @@
 import * as orderService from './order.service.js';
 import catchAsync from '../../utils/catch-async.js';
-import { ROLES } from '../../utils/constants.js';
+import { ROLES, ACTOR_TYPE } from '../../utils/constants.js';
 
 export const createOrder = catchAsync(async (req, res) => {
   const result = await orderService.createOrder(req.user.id, req.body);
@@ -9,6 +9,45 @@ export const createOrder = catchAsync(async (req, res) => {
     success: true,
     message: 'Order created successfully. Finding a driver...',
     data: result,
+  });
+});
+
+export const dispatchOrder = catchAsync(async (req, res) => {
+  const order = await orderService.dispatchOrder(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Order dispatched to online drivers',
+    data: { order },
+  });
+});
+
+export const acceptOrder = catchAsync(async (req, res) => {
+  const order = await orderService.acceptOrder(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Order accepted by driver',
+    data: { order },
+  });
+});
+
+export const declineOrder = catchAsync(async (req, res) => {
+  const result = await orderService.declineOrder(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+  });
+});
+
+export const confirmMatchOrder = catchAsync(async (req, res) => {
+  const order = await orderService.confirmMatchOrder(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Order matched and customer notified',
+    data: { order },
   });
 });
 
@@ -37,22 +76,9 @@ export const getOrderById = catchAsync(async (req, res) => {
   });
 });
 
-export const updateStatus = catchAsync(async (req, res) => {
-  const order = await orderService.updateOrderStatus(
-    req.user.id,
-    req.params.id,
-    req.body.status
-  );
-
-  res.status(200).json({
-    success: true,
-    message: `Order status updated to ${order.status}`,
-    data: { order },
-  });
-});
-
 export const cancelOrder = catchAsync(async (req, res) => {
-  const order = await orderService.cancelOrder(req.user.id, req.params.id);
+  const actorType = req.user.role === ROLES.ADMIN ? ACTOR_TYPE.ADMIN : ACTOR_TYPE.CUSTOMER;
+  const order = await orderService.cancelOrder(req.params.id, req.user.id, actorType, req.body.reason);
 
   res.status(200).json({
     success: true,

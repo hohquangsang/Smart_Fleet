@@ -4,10 +4,6 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import DriversPage from '../pages/admin/DriversPage';
 import UsersPage from '../pages/admin/UsersPage';
-import OrdersPage from '../pages/admin/OrdersPage';
-import LiveFleetPage from '../pages/admin/LiveFleetPage';
-import AnalyticsPage from '../pages/admin/AnalyticsPage';
-import AlertsPage from '../pages/admin/AlertsPage';
 import CreateOrderPage from '../pages/customer/CreateOrderPage';
 import CustomerTrackingPage from '../pages/customer/CustomerTrackingPage';
 import CustomerHistoryPage from '../pages/customer/CustomerHistoryPage';
@@ -34,10 +30,7 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: 'drivers', element: <DriversPage /> },
       { path: 'users', element: <UsersPage /> },
-      { path: 'orders', element: <OrdersPage /> },
-      { path: 'tracking', element: <LiveFleetPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'alerts', element: <AlertsPage /> },
+      { path: '*', element: <Navigate to="/admin" replace /> },
     ],
   },
 
@@ -46,7 +39,7 @@ export const router = createBrowserRouter([
     path: '/customer',
     element: (
       <ProtectedRoute allowedRoles={['CUSTOMER']}>
-        <DashboardLayout title="SmartFleet Khách Hàng" />
+        <DashboardLayout title="Khách Hàng" />
       </ProtectedRoute>
     ),
     children: [

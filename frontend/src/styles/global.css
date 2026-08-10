@@ -31,6 +31,11 @@ button { cursor: pointer; border: none; outline: none; font-family: inherit; }
 input, textarea, select { font-family: inherit; outline: none; }
 img { max-width: 100%; display: block; }
 
+/* ─── Google Maps Dark Mode Tile Layer ─────────────── */
+.google-maps-dark-tiles {
+  filter: invert(92%) hue-rotate(180deg) contrast(115%) saturate(130%) !important;
+}
+
 /* ─── SmartFleet Design Tokens ───────────────── */
 :root {
   /* Colors */

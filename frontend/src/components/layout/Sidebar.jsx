@@ -28,7 +28,7 @@ const customerNavItems = [
 const driverNavItems = [
   { path: '/driver', label: 'Tổng quan & Trạng thái', icon: <HiOutlineViewGrid /> },
   { path: '/driver/dispatch', label: 'Nhận đơn Real-time', icon: <HiOutlineTruck /> },
-  { path: '/driver/active', label: 'Đang giao hàng', icon: <HiOutlineMap /> },
+  { path: '/driver/active', label: 'Đang ', icon: <HiOutlineMap /> },
   { path: '/driver/earnings', label: 'Thu nhập & Hiệu suất', icon: <HiOutlineChartBar /> },
 ];
 

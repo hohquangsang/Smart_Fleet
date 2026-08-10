@@ -71,6 +71,7 @@ model Order {
   customerId     String      @map("customer_id") @db.Uuid
   driverId       String?     @map("driver_id") @db.Uuid
   status         OrderStatus @default(PENDING)
+  vehicleType    String?     @map("vehicle_type") @db.VarChar(50)
   pickupAddress  String      @map("pickup_address")
   pickupLat      Float       @map("pickup_lat") @db.DoublePrecision
   pickupLng      Float       @map("pickup_lng") @db.DoublePrecision
@@ -81,6 +82,10 @@ model Order {
   distanceKm     Decimal     @map("distance_km") @db.Decimal(6, 2)
   baseEtaMin     Int         @map("base_eta_min")
   aiEtaMin       Int?        @map("ai_eta_min")
+  dispatchedAt   DateTime?   @map("dispatched_at") @db.Timestamptz()
+  acceptedAt     DateTime?   @map("accepted_at") @db.Timestamptz()
+  matchedAt      DateTime?   @map("matched_at") @db.Timestamptz()
+  cancelReason   String?     @map("cancel_reason")
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -88,6 +93,7 @@ model Order {
   driver            Driver?                 @relation("DriverOrders", fields: [driverId], references: [id], onDelete: SetNull)
   invoice           Invoice?                @relation("OrderInvoice")
   locationHistories DriverLocationHistory[] @relation("OrderLocations")
+  statusHistories   OrderStatusHistory[]    @relation("OrderHistories")
 
   @@index([customerId, status], name: "idx_orders_status_customer")
   @@index([status], name: "idx_orders_pending")
@@ -96,12 +102,43 @@ model Order {
 
 enum OrderStatus {
   PENDING
+  DISPATCHING
+  DRIVER_ACCEPTED
   MATCHED
+  IN_TRANSIT
   PICKED_UP
+  COMPLETED
   DELIVERED
   CANCELLED
+  EXPIRED_NO_DRIVER
 
   @@map("order_status")
+}
+
+// ─── Order Status History ────────────────────────────────
+model OrderStatusHistory {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  actorType  ActorType    @map("actor_type")
+  actorId    String?      @map("actor_id") @db.Uuid
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  order Order @relation("OrderHistories", fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt], name: "idx_order_status_history")
+  @@map("order_status_history")
+}
+
+enum ActorType {
+  CUSTOMER
+  ADMIN
+  DRIVER
+  SYSTEM
+
+  @@map("actor_type")
 }
 
 // ─── Driver Location History ─────────────────────────────

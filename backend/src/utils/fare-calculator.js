@@ -10,13 +10,14 @@ import { FARE_RATES } from './constants.js';
 export const calculateFare = (distanceKm, vehicleType = 'motorcycle') => {
   const rate = FARE_RATES[vehicleType] || FARE_RATES.motorcycle;
 
-  const distanceFare = distanceKm * rate.perKm;
-  const totalBeforeMin = rate.baseFare + distanceFare;
-  const totalFare = Math.max(totalBeforeMin, rate.minFare);
+  const distanceFare = Math.ceil(distanceKm) * rate.perKm;
+  const totalFare = Math.max(distanceFare, rate.minFare);
 
   return {
-    baseFare: rate.baseFare,
-    distanceFare: Math.round(distanceFare),
+    vehicleType,
+    vehicleName: rate.name,
+    perKm: rate.perKm,
+    distanceKm: Math.ceil(distanceKm),
     totalFare: Math.round(totalFare),
   };
 };

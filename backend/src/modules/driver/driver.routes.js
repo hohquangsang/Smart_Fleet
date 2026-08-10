@@ -13,5 +13,6 @@ router.use(authorize(ROLES.DRIVER));
 
 router.get('/me', driverController.getProfile);
 router.patch('/status', validate(toggleStatusSchema), driverController.toggleStatus);
+router.post('/orders/:id/accept', driverController.acceptOrder);
 
 export default router;

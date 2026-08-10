@@ -7,6 +7,7 @@ export const createOrderSchema = z.object({
   dropoffAddress: z.string().min(1, 'Dropoff address is required'),
   dropoffLat: z.number().min(-90).max(90),
   dropoffLng: z.number().min(-180).max(180),
+  vehicleType: z.enum(['motorcycle', 'car_4', 'car_7']).optional().default('motorcycle'),
 });
 
 export const updateStatusSchema = z.object({

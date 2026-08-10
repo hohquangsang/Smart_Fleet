@@ -35,12 +35,25 @@ export const getRouteWithCache = async (pickupLat, pickupLng, dropoffLat, dropof
     return { ...JSON.parse(cached), cached: true };
   }
 
-  // Cache miss — call ORS
+  // Cache miss — call ORS with Haversine fallback
   console.log(`🗺️  Route cache MISS: ${cacheKey}`);
-  const route = await orsService.getRoute(pickupLng, pickupLat, dropoffLng, dropoffLat);
-
-  // Store in cache with TTL
-  await redis.set(cacheKey, JSON.stringify(route), 'EX', env.ROUTE_CACHE_TTL_SEC);
-
-  return { ...route, cached: false };
+  try {
+    const route = await orsService.getRoute(pickupLng, pickupLat, dropoffLng, dropoffLat);
+    await redis.set(cacheKey, JSON.stringify(route), 'EX', env.ROUTE_CACHE_TTL_SEC);
+    return { ...route, cached: false };
+  } catch (err) {
+    console.warn(`⚠️ ORS API error, using Haversine fallback: ${err.message}`);
+    const R = 6371;
+    const dLat = ((dropoffLat - pickupLat) * Math.PI) / 180;
+    const dLon = ((dropoffLng - pickupLng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((pickupLat * Math.PI) / 180) *
+        Math.cos((dropoffLat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const dist = Math.max(1, Math.ceil(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))));
+    const fallbackRoute = { distanceKm: dist, durationMin: dist * 3 };
+    return { ...fallbackRoute, cached: false };
+  }
 };

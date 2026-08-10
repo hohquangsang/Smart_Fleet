@@ -90,3 +90,58 @@ export const toggleStatus = async (userId, { lat, lng }) => {
     return { status: DRIVER_STATUS.OFFLINE, driverId: driver.id };
   }
 };
+
+/**
+ * Accept a pending order.
+ */
+export const acceptOrder = async (userId, orderId) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId },
+    include: { user: { select: { fullName: true, phoneNumber: true } } },
+  });
+
+  if (!driver) throw new NotFoundError('Driver profile not found');
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new NotFoundError('Order not found');
+  if (order.status !== 'PENDING') {
+    throw new ForbiddenError('Order is no longer available');
+  }
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: 'MATCHED',
+      driverId: driver.id,
+    },
+    include: {
+      driver: {
+        include: { user: { select: { fullName: true, phoneNumber: true } } },
+      },
+    },
+  });
+
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    io.of('/customer').emit('order-matched', {
+      orderId: order.id,
+      status: 'MATCHED',
+      driver: {
+        id: driver.id,
+        name: driver.user?.fullName || 'Nguyễn Văn Nam',
+        phone: driver.user?.phoneNumber || '0908123456',
+        licensePlate: driver.licensePlate || '51K-888.99',
+      },
+    });
+
+    io.of('/admin').emit('order-matched', {
+      orderId: order.id,
+      driverName: driver.user?.fullName,
+    });
+  } catch (err) {
+    console.error('Socket emit error on acceptOrder:', err);
+  }
+
+  return updatedOrder;
+};

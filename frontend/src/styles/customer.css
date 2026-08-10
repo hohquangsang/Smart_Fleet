@@ -26,14 +26,17 @@
 }
 
 /* ─── Màn hình 1: Split-screen Đặt đơn & Tính cước ───────────── */
-.order-split-layout {
+.order-split-layout,
+.split-layout {
   display: grid;
   grid-template-columns: 460px 1fr;
   gap: 1.5rem;
   min-height: calc(100vh - var(--topbar-height) - 4rem);
+  align-items: stretch;
 }
 
-.order-form-panel {
+.order-form-panel,
+.left-panel {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
@@ -43,6 +46,12 @@
   gap: 1.25rem;
   box-shadow: var(--shadow-md);
   height: fit-content;
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .location-input-group {
@@ -104,20 +113,39 @@
   outline: none;
 }
 
-.btn-location-geo {
-  padding: 4px 10px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: var(--radius-sm);
-  color: var(--accent-blue);
+.btn-location-geo,
+.btn-gps-current {
+  padding: 5px 12px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: var(--radius-full);
+  color: #5B9DF5;
   font-size: 0.775rem;
-  font-weight: 500;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+}
+
+.btn-location-geo:hover,
+.btn-gps-current:hover {
+  background: var(--gradient-blue);
+  border-color: var(--accent-blue);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-gps-current:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-gps-icon {
+  font-size: 0.95rem;
 }
 
 .btn-location-geo:hover {
@@ -301,10 +329,13 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   overflow: hidden;
-  min-height: 520px;
+  min-height: 560px;
+  height: 100%;
+  flex: 1;
 }
 
-.map-floating-chip {
+.map-floating-chip,
+.map-chip-floating {
   position: absolute;
   top: 18px;
   left: 18px;
@@ -318,6 +349,8 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  font-size: 0.85rem;
 }
 
 .map-chip-item {
