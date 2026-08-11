@@ -17,11 +17,15 @@ router.post('/', authorize(ROLES.CUSTOMER), validate(createOrderSchema), orderCo
 router.post('/:id/dispatch', authorize(ROLES.ADMIN), orderController.dispatchOrder);
 
 // Step 3: Driver accepts / declines order
+router.get('/available-dispatch', authorize(ROLES.DRIVER), orderController.getAvailableDispatchOrder);
 router.post('/:id/accept', authorize(ROLES.DRIVER), orderController.acceptOrder);
 router.post('/:id/decline', authorize(ROLES.DRIVER), orderController.declineOrder);
 
 // Step 4: Admin confirms match with customer
 router.post('/:id/confirm-match', authorize(ROLES.ADMIN), orderController.confirmMatchOrder);
+
+// Step 5: Driver starts trip (MATCHED → IN_TRANSIT = ĐANG GIAO)
+router.post('/:id/start-trip', authorize(ROLES.DRIVER), orderController.startTrip);
 
 // Get orders list / details
 router.get('/', authorize(ROLES.CUSTOMER, ROLES.DRIVER, ROLES.ADMIN), orderController.getOrders);

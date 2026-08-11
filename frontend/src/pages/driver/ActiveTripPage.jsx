@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useContext } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { HiOutlinePhone, HiOutlineChatAlt, HiOutlineExclamation, HiOutlineCheckCircle, HiOutlineX } from 'react-icons/hi';
 import useToast from '../../hooks/useToast';
+import { SocketContext } from '../../contexts/SocketContext';
+import api from '../../services/api';
 import '../../styles/driver.css';
 
 const INCIDENTS = [
@@ -14,18 +16,41 @@ const INCIDENTS = [
 
 const ActiveTripPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
+  const socket = useContext(SocketContext);
 
-  // Trip stage: 1 = Heading to Pickup, 2 = Delivering, 3 = Completed
+  // orderId lấy từ location.state (navigate từ DriverDispatchPage) hoặc localStorage
+  const orderId = location.state?.orderId || localStorage.getItem('activeOrderId');
+
+  // Trip stage: 1 = Heading to Pickup, 2 = Delivering (IN_TRANSIT), 3 = Completed
   const [tripStage, setTripStage] = useState(1);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState(INCIDENTS[0]);
+  const [startingTrip, setStartingTrip] = useState(false);
 
   // Stage button handler
-  const handleNextStage = () => {
+  const handleNextStage = async () => {
     if (tripStage === 1) {
-      setTripStage(2);
-      toast.success('Đã đến điểm lấy hàng! Đã cập nhật tuyến đường giao hàng tối ưu do AI sắp xếp.', 'Cập nhật lộ trình');
+      // Stage 1 → 2: Đã lấy hàng, bắt đầu giao (IN_TRANSIT)
+      setStartingTrip(true);
+      try {
+        if (orderId) {
+          // Gọi API start-trip
+          await api.post(`/orders/${orderId}/start-trip`);
+        }
+        // Emit socket start-trip (double confirm)
+        if (socket && orderId) {
+          socket.emit('start-trip', { orderId });
+        }
+        setTripStage(2);
+        toast.success('Đang giao hàng! Trạng thái ĐANG GIAO đã cập nhật cho khách hàng.', 'Bắt đầu giao');
+      } catch (err) {
+        const msg = err.response?.data?.message || 'Không thể cập nhật trạng thái.';
+        toast.error(msg, 'Lỗi');
+      } finally {
+        setStartingTrip(false);
+      }
     } else if (tripStage === 2) {
       setTripStage(3);
       toast.success('ĐƠN HÀNG ĐÃ GIAO THÀNH CÔNG! Hóa đơn tự động đang được khởi tạo.', 'Hoàn tất chuyến');
@@ -151,8 +176,10 @@ const ActiveTripPage = () => {
                   type="button"
                   className="step-action-button step-action-button--blue"
                   onClick={handleNextStage}
+                  disabled={startingTrip}
+                  style={{ opacity: startingTrip ? 0.6 : 1 }}
                 >
-                  Đã Đến Điểm Lấy Hàng ➔
+                  {startingTrip ? 'Đang cập nhật...' : 'Đã Đến — Bắt Đầu Giao Hàng ➔'}
                 </button>
               </>
             )}

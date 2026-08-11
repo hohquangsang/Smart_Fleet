@@ -30,3 +30,13 @@ export const acceptOrder = catchAsync(async (req, res) => {
     data: { order },
   });
 });
+
+export const getEarnings = catchAsync(async (req, res) => {
+  const { period } = req.query;
+  const data = await driverService.getDriverEarnings(req.user.id, { period });
+
+  res.status(200).json({
+    success: true,
+    data,
+  });
+});

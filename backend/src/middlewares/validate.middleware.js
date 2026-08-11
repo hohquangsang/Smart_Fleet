@@ -25,8 +25,14 @@ const validate = (schema, source = 'body') => {
       return next(new BadRequestError(firstMsg, errors));
     }
 
-    // Replace with parsed/coerced data
-    req[source] = result.data;
+    // req.query is a read-only getter in newer Express/router versions.
+    // Use Object.assign to mutate the existing object instead of re-assigning.
+    if (source === 'query') {
+      Object.assign(req.query, result.data);
+    } else {
+      req[source] = result.data;
+    }
+
     next();
   };
 };

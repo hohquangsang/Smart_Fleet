@@ -92,22 +92,25 @@ const orderWorker = new Worker(
       const driverNamespace = io.of('/driver');
 
       const orderPayload = {
-        id: order.id,
+        orderId: order.id,
         pickupAddress: order.pickupAddress,
         pickupLat: order.pickupLat,
         pickupLng: order.pickupLng,
         dropoffAddress: order.dropoffAddress,
         dropoffLat: order.dropoffLat,
         dropoffLng: order.dropoffLng,
-        totalFare: order.totalFare,
-        distanceKm: order.distanceKm,
+        fare: Number(order.totalFare),
+        distanceKm: Number(order.distanceKm),
         baseEtaMin: order.baseEtaMin,
-        aiEtaMin: order.aiEtaMin,
+        etaMin: order.aiEtaMin || order.baseEtaMin,
+        vehicleType: order.vehicleType,
         customer: order.customer,
+        expiresInSec: 30,
       };
 
-      for (const { userId } of eligibleDriverIds) {
-        driverNamespace.to(`user:${userId}`).emit('new-order', orderPayload);
+      for (const { driverId, userId } of eligibleDriverIds) {
+        driverNamespace.to(`driver:${driverId}`).emit('driver:new-order', orderPayload);
+        driverNamespace.to(`user:${userId}`).emit('driver:new-order', orderPayload);
       }
 
       console.log(`✅ Dispatched order ${orderId} to ${eligibleDriverIds.length} drivers`);

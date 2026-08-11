@@ -4,6 +4,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import DriversPage from '../pages/admin/DriversPage';
 import UsersPage from '../pages/admin/UsersPage';
+import AdminOrdersPage from '../pages/admin/OrdersPage';
 import CreateOrderPage from '../pages/customer/CreateOrderPage';
 import CustomerTrackingPage from '../pages/customer/CustomerTrackingPage';
 import CustomerHistoryPage from '../pages/customer/CustomerHistoryPage';
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'orders', element: <AdminOrdersPage /> },
       { path: 'drivers', element: <DriversPage /> },
       { path: 'users', element: <UsersPage /> },
       { path: '*', element: <Navigate to="/admin" replace /> },

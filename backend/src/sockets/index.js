@@ -29,7 +29,10 @@ export const initSocketHandlers = () => {
       socket.disconnect(true);
       return;
     }
-    console.log(`🛡️  Admin connected: ${socket.user.id}`);
+
+    // Join shared admin room so gateway can broadcast to all admins
+    socket.join('admin:notifications');
+    console.log(`🛡️  Admin connected: ${socket.user.id} → joined admin:notifications`);
 
     socket.on('disconnect', () => {
       console.log(`🛡️  Admin disconnected: ${socket.user.id}`);

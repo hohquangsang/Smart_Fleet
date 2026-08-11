@@ -21,6 +21,8 @@ redlock.on('error', (error) => {
   console.error('Redlock error:', error);
 });
 
+import { REDIS_KEYS } from '../utils/constants.js';
+
 /**
  * Acquire a lock for accepting an order.
  *
@@ -30,7 +32,8 @@ redlock.on('error', (error) => {
  */
 export const acquireOrderLock = async (orderId, ttl = 5000) => {
   try {
-    const lock = await redlock.acquire([`order-lock:${orderId}`], ttl);
+    const lockKey = REDIS_KEYS.ORDER_LOCK(orderId);
+    const lock = await redlock.acquire([lockKey], ttl);
     return lock;
   } catch {
     return null; // Lock not acquired — another driver got it

@@ -1,9 +1,14 @@
 import redis from '../config/redis.js';
 import prisma from '../config/database.js';
 import { acquireOrderLock, releaseLock } from '../services/redlock.service.js';
-import { REDIS_KEYS, DRIVER_STATUS, ORDER_STATUS, APPROVAL_STATUS } from '../utils/constants.js';
+import { REDIS_KEYS, DRIVER_STATUS, ORDER_STATUS, APPROVAL_STATUS, ACTOR_TYPE } from '../utils/constants.js';
 import { getIO } from '../config/socket.js';
 import { invoiceQueue } from '../queues/invoice.worker.js';
+import { transitionOrderStatus } from '../modules/order/order-status.service.js';
+import { emitCustomerOrderStatus, emitAdminDriverAccepted, emitDriverOrderTaken, emitAdminOrderStatusUpdate } from './socket.gateway.js';
+import { clearDispatchDeadline } from '../modules/order/dispatch.service.js';
+
+import { registerOnlineDriver, unregisterOnlineDriver } from '../modules/order/dispatch.service.js';
 
 /**
  * Setup driver namespace socket handlers.
@@ -18,14 +23,26 @@ export const setupDriverSocket = (driverNamespace) => {
       return;
     }
 
-    // Join a room for this user (for targeted dispatch)
+    // Join user room (general) — driver-specific room joined after DB query
     socket.join(`user:${userId}`);
     console.log(`🚗 Driver connected: ${userId}`);
 
-    // Get driver ID
+    // Get driver ID & info
     const driver = await prisma.driver.findUnique({
       where: { userId },
-      select: { id: true, approvalStatus: true },
+      select: {
+        id: true,
+        approvalStatus: true,
+        vehicleType: true,
+        licensePlate: true,
+        rating: true,
+        user: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+          },
+        },
+      },
     });
 
     if (!driver) {
@@ -36,12 +53,28 @@ export const setupDriverSocket = (driverNamespace) => {
 
     const driverId = driver.id;
 
+    // Join driver-specific room now that driverId is available (for targeted dispatch)
+    socket.join(`driver:${driverId}`);
+    console.log(`🚗 Driver ${driverId} joined room driver:${driverId}`);
+
+    // If driver is active in DB and approved, auto-join online rooms on socket connection/reconnect
+    if (driver.isActive && driver.approvalStatus === APPROVAL_STATUS.APPROVED) {
+      socket.join('drivers:online');
+      socket.join(`drivers:online:${driver.vehicleType || 'motorcycle'}`);
+      await registerOnlineDriver(driverId, driver.vehicleType || 'motorcycle').catch(() => {});
+      await redis.set(REDIS_KEYS.DRIVER_STATUS(driverId), DRIVER_STATUS.ONLINE).catch(() => {});
+      console.log(`🟢 Driver ${driverId} auto-joined drivers:online room on socket connection`);
+    }
+
     // ─── Go Online ─────────────────────────────
     socket.on('go-online', async ({ lat, lng }) => {
       if (driver.approvalStatus !== APPROVAL_STATUS.APPROVED) {
         socket.emit('error', { message: 'Account not approved yet' });
         return;
       }
+
+      socket.join('drivers:online');
+      socket.join(`drivers:online:${driver.vehicleType || 'motorcycle'}`);
 
       await redis.geoadd(REDIS_KEYS.DRIVER_LOCATIONS, lng, lat, driverId);
       await redis.hset(REDIS_KEYS.DRIVER_LOCATION(driverId), {
@@ -53,15 +86,36 @@ export const setupDriverSocket = (driverNamespace) => {
       });
       await redis.set(REDIS_KEYS.DRIVER_STATUS(driverId), DRIVER_STATUS.ONLINE);
 
+      // Register driver in online Redis set for dispatching by vehicleType
+      await registerOnlineDriver(driverId, driver.vehicleType || 'motorcycle');
+
+      // Update DB active status so GET /drivers/me returns isActive: true on refresh
+      await prisma.driver.update({
+        where: { id: driverId },
+        data: { isActive: true },
+      });
+
       socket.emit('status-changed', { status: DRIVER_STATUS.ONLINE });
       console.log(`🟢 Driver ${driverId} is ONLINE at ${lat},${lng}`);
     });
 
     // ─── Go Offline ────────────────────────────
     socket.on('go-offline', async () => {
+      socket.leave('drivers:online');
+      socket.leave(`drivers:online:${driver.vehicleType || 'motorcycle'}`);
+
       await redis.zrem(REDIS_KEYS.DRIVER_LOCATIONS, driverId);
       await redis.del(REDIS_KEYS.DRIVER_LOCATION(driverId));
       await redis.set(REDIS_KEYS.DRIVER_STATUS(driverId), DRIVER_STATUS.OFFLINE);
+
+      // Unregister driver from online set
+      await unregisterOnlineDriver(driverId, driver.vehicleType || 'motorcycle');
+
+      // Update DB active status so GET /drivers/me returns isActive: false on refresh
+      await prisma.driver.update({
+        where: { id: driverId },
+        data: { isActive: false },
+      });
 
       socket.emit('status-changed', { status: DRIVER_STATUS.OFFLINE });
       console.log(`🔴 Driver ${driverId} is OFFLINE`);
@@ -112,73 +166,141 @@ export const setupDriverSocket = (driverNamespace) => {
       });
     });
 
-    // ─── Accept Order ──────────────────────────
+    // ─── Accept Order (via socket swipe) ─────────────────────
     socket.on('accept-order', async ({ orderId }) => {
       console.log(`🤝 Driver ${driverId} attempting to accept order ${orderId}`);
 
-      // Try to acquire distributed lock
+      // Try to acquire distributed lock (race condition protection)
       const lock = await acquireOrderLock(orderId);
 
       if (!lock) {
         socket.emit('order-taken', {
           orderId,
-          message: 'This order has already been accepted by another driver',
+          message: 'Đơn đã được tài xế khác nhận rồi',
         });
         return;
       }
 
       try {
-        // Verify order is still PENDING
+        // Verify order is still in DISPATCHING state
         const order = await prisma.order.findUnique({
           where: { id: orderId },
+          include: {
+            customer: { select: { id: true, fullName: true } },
+          },
         });
 
-        if (!order || order.status !== ORDER_STATUS.PENDING) {
-          socket.emit('order-taken', { orderId, message: 'Order is no longer available' });
+        if (!order || order.status !== ORDER_STATUS.DISPATCHING) {
+          socket.emit('order-taken', { orderId, message: 'Đơn không còn sẵn sàng để nhận' });
           return;
         }
 
-        // Update order: PENDING → MATCHED
-        await prisma.order.update({
-          where: { id: orderId },
-          data: {
-            status: ORDER_STATUS.MATCHED,
-            driverId,
-          },
+        // Use state-machine service: DISPATCHING → IN_TRANSIT ("ĐANG GIAO")
+        const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
+          actorType: ACTOR_TYPE.DRIVER,
+          actorId: driver.id,
+          driverId: driver.id,
         });
+
+        // Clear the 30s dispatch deadline
+        await clearDispatchDeadline(orderId);
 
         // Set driver status to on-trip
         await redis.set(REDIS_KEYS.DRIVER_STATUS(driverId), DRIVER_STATUS.ON_TRIP);
 
-        // Notify this driver: confirmed
-        const driverUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { fullName: true, phoneNumber: true },
-        });
+        const driverPayload = {
+          id: driverId,
+          name: driver?.user?.fullName || 'Tài xế SmartFleet',
+          phone: driver?.user?.phoneNumber || '',
+          licensePlate: driver?.licensePlate || '',
+          rating: driver?.rating || 5.0,
+        };
 
+        // Notify this driver: confirmed
         socket.emit('order-confirmed', {
           orderId,
-          order: {
-            ...order,
-            status: ORDER_STATUS.MATCHED,
-          },
+          order: updatedOrder,
+          message: 'Bạn đã nhận đơn thành công! Trạng thái đơn hàng: ĐANG GIAO.',
         });
 
-        // Notify customer: matched
-        const io = getIO();
-        const customerNamespace = io.of('/customer');
-        customerNamespace.to(`user:${order.customerId}`).emit('order-matched', {
+        // Notify other drivers to close dispatch bottom sheet
+        emitDriverOrderTaken(orderId, driverId);
+
+        // Notify admin: driver accepted & status is now IN_TRANSIT
+        emitAdminDriverAccepted(orderId, driverPayload);
+        emitAdminOrderStatusUpdate(orderId, {
+          status: ORDER_STATUS.IN_TRANSIT,
+          label: 'ĐANG GIAO',
+          driver: driverPayload,
+          totalFare: order.totalFare,
+        });
+
+        // Notify Customer: status is now IN_TRANSIT ("ĐANG GIAO")
+        emitCustomerOrderStatus(order.customerId, {
           orderId,
-          driver: {
-            id: driverId,
-            name: driverUser?.fullName,
-            phone: driverUser?.phoneNumber,
-          },
+          status: ORDER_STATUS.IN_TRANSIT,
+          label: 'ĐANG GIAO',
+          driver: driverPayload,
+          totalFare: order.totalFare,
         });
 
-        console.log(`✅ Order ${orderId} matched to driver ${driverId}`);
+        console.log(`Order ${orderId} IN_TRANSIT by driver ${driverId}`);
       } finally {
         await releaseLock(lock);
+      }
+    });
+
+    // ─── Start Trip (Driver bắt đầu giao: MATCHED / IN_TRANSIT) ───────────
+    socket.on('start-trip', async ({ orderId }) => {
+      console.log(`🚀 Driver ${driverId} starting trip for order ${orderId}`);
+
+      try {
+        const order = await prisma.order.findUnique({ where: { id: orderId } });
+
+        if (!order || (order.status !== ORDER_STATUS.MATCHED && order.status !== ORDER_STATUS.IN_TRANSIT)) {
+          socket.emit('error', { message: 'Đơn hàng chưa ở trạng thái có thể bắt đầu giao' });
+          return;
+        }
+
+        let updatedOrder = order;
+        if (order.status !== ORDER_STATUS.IN_TRANSIT) {
+          // MATCHED → IN_TRANSIT
+          updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
+            actorType: ACTOR_TYPE.DRIVER,
+            actorId: driver.id,
+          });
+        }
+
+        socket.emit('trip-started', { orderId, order: updatedOrder });
+
+        const driverPayload = {
+          id: driverId,
+          name: driver?.user?.fullName || 'Tài xế SmartFleet',
+          phone: driver?.user?.phoneNumber || '',
+          licensePlate: driver?.licensePlate || '',
+          rating: driver?.rating || 5.0,
+        };
+
+        // Notify Customer & Admin: ĐANG GIAO
+        emitCustomerOrderStatus(order.customerId, {
+          orderId,
+          status: ORDER_STATUS.IN_TRANSIT,
+          label: 'ĐANG GIAO',
+          driver: driverPayload,
+          totalFare: order.totalFare,
+        });
+
+        emitAdminOrderStatusUpdate(orderId, {
+          status: ORDER_STATUS.IN_TRANSIT,
+          label: 'ĐANG GIAO',
+          driver: driverPayload,
+          totalFare: order.totalFare,
+        });
+
+        console.log(`🚚 Order ${orderId} is now IN_TRANSIT`);
+      } catch (err) {
+        console.error('start-trip error:', err.message);
+        socket.emit('error', { message: err.message });
       }
     });
 

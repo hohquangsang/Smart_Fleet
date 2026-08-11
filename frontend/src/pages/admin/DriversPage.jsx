@@ -1,67 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { HiOutlineSearch, HiOutlineDocumentText, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineLockClosed, HiOutlineLockOpen, HiOutlineX } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
+import { SocketContext } from '../../contexts/SocketContext';
 import '../../styles/admin.css';
-
-const MOCK_DRIVERS = [
-  {
-    id: 'd1',
-    name: 'Nguyễn Văn Nam',
-    phone: '0908.123.456',
-    vehicleType: 'Xe Tải Nhỏ (1 Tấn)',
-    licensePlate: '51K-888.99',
-    approvalStatus: 'PENDING',
-    isOnline: true,
-    rating: 4.9,
-    createdAt: '02/08/2026',
-    acceptRate: '96%',
-    completeRate: '99%',
-  },
-  {
-    id: 'd2',
-    name: 'Trần Văn Driver',
-    phone: '0912.345.678',
-    vehicleType: 'Xe Máy Express',
-    licensePlate: '75A-639.19',
-    approvalStatus: 'APPROVED',
-    isOnline: true,
-    rating: 5.0,
-    createdAt: '15/07/2026',
-    acceptRate: '98%',
-    completeRate: '100%',
-  },
-  {
-    id: 'd3',
-    name: 'Lê Văn Cường',
-    phone: '0933.888.999',
-    vehicleType: 'Xe Tải Lớn (3.5 Tấn)',
-    licensePlate: '51H-999.88',
-    approvalStatus: 'APPROVED',
-    isOnline: false,
-    rating: 4.7,
-    createdAt: '01/06/2026',
-    acceptRate: '92%',
-    completeRate: '95%',
-  },
-  {
-    id: 'd4',
-    name: 'Phạm Văn Hùng',
-    phone: '0977.111.222',
-    vehicleType: 'Xe Tải Nhỏ (1.5 Tấn)',
-    licensePlate: '51C-777.66',
-    approvalStatus: 'BLOCKED',
-    isOnline: false,
-    rating: 3.5,
-    createdAt: '10/05/2026',
-    acceptRate: '75%',
-    completeRate: '80%',
-  },
-];
 
 const DriversPage = () => {
   const toast = useToast();
-  const [drivers, setDrivers] = useState(MOCK_DRIVERS);
+  const socket = useContext(SocketContext);
+  const [drivers, setDrivers] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
@@ -72,33 +19,70 @@ const DriversPage = () => {
   const [actionReason, setActionReason] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  // Fetch real drivers from backend if available
+  // Fetch real drivers from backend
   useEffect(() => {
     const fetchDrivers = async () => {
       try {
         const { data } = await api.get('/admin/drivers');
-        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
-          const mapped = data.data.map((d) => ({
+        const driverList = data?.data?.drivers || (Array.isArray(data?.data) ? data.data : []);
+        if (Array.isArray(driverList)) {
+          const mapped = driverList.map((d) => ({
             id: d.id,
             name: d.user?.fullName || 'Tài xế SmartFleet',
-            phone: d.user?.phoneNumber || '0900000000',
-            vehicleType: d.vehicleType || 'Xe tải',
-            licensePlate: d.licensePlate || '51K-000.00',
-            approvalStatus: d.approvalStatus || 'APPROVED',
-            isOnline: d.isActive || false,
+            phone: d.user?.phoneNumber || '—',
+            vehicleType: d.vehicleType || 'Xe máy',
+            licensePlate: d.licensePlate || '—',
+            approvalStatus: d.approvalStatus || 'PENDING',
+            isOnline: Boolean(d.isOnline || d.isActive),
+            status: d.isOnline || d.isActive ? 'ONLINE' : 'OFFLINE',
             rating: parseFloat(d.rating || 5.0),
-            createdAt: new Date(d.user?.createdAt || Date.now()).toLocaleDateString('vi-VN'),
-            acceptRate: '95%',
-            completeRate: '98%',
+            createdAt: d.user?.createdAt ? new Date(d.user.createdAt).toLocaleDateString('vi-VN') : '—',
+            acceptRate: '100%',
+            completeRate: '100%',
           }));
           setDrivers(mapped);
         }
       } catch {
-        // Fallback to MOCK_DRIVERS
+        setDrivers([]);
       }
     };
     fetchDrivers();
   }, []);
+
+  // Listen to admin:new-driver-registered real-time socket event
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewDriver = (d) => {
+      console.log('🚘 [Admin] admin:new-driver-registered received:', d);
+      toast.info(
+        `Tài xế mới ${d.fullName || ''} (${d.licensePlate || ''}) vừa đăng ký và đang chờ duyệt!`,
+        '📋 Hồ sơ tài xế mới'
+      );
+
+      const newDriverObj = {
+        id: d.id,
+        name: d.fullName || 'Tài xế mới',
+        phone: d.phoneNumber || '0900000000',
+        vehicleType: d.vehicleType || 'Xe máy',
+        licensePlate: d.licensePlate || 'Chưa cập nhật',
+        approvalStatus: 'PENDING',
+        isOnline: false,
+        rating: 5.0,
+        createdAt: new Date(d.createdAt || Date.now()).toLocaleDateString('vi-VN'),
+        acceptRate: '100%',
+        completeRate: '100%',
+      };
+
+      setDrivers((prev) => [newDriverObj, ...prev.filter((item) => item.id !== d.id)]);
+    };
+
+    socket.on('admin:new-driver-registered', handleNewDriver);
+
+    return () => {
+      socket.off('admin:new-driver-registered', handleNewDriver);
+    };
+  }, [socket, toast]);
 
   // Filtered drivers list
   const filteredDrivers = drivers.filter((d) => {

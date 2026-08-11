@@ -46,7 +46,7 @@ export const predictETA = async (params) => {
     };
   } catch (error) {
     // AI service is optional — fallback gracefully
-    console.warn('⚠️  AI ETA prediction failed, using base ETA:', error.message);
+    console.warn('AI ETA prediction failed, using base ETA:', error.message);
     return {
       aiEtaMin: null,
       confidence: 0,

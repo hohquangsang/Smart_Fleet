@@ -13,7 +13,8 @@ const adminNavGroups = [
   {
     groupTitle: 'QUẢN LÝ',
     items: [
-      { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers />, badge: '3', badgeColor: '#F5A623' },
+      { path: '/admin/orders', label: 'Đơn hàng', icon: <HiOutlineShoppingCart />, badge: null },
+      { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers />, badge: null },
       { path: '/admin/users', label: 'Người dùng', icon: <HiOutlineUserGroup /> },
     ],
   },

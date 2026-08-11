@@ -19,6 +19,7 @@ export const getDashboardStats = async () => {
     deliveredToday,
     revenueToday,
     avgDeliveryTime,
+    totalUsers,
   ] = await Promise.all([
     // Orders today
     prisma.order.count({
@@ -56,6 +57,10 @@ export const getDashboardStats = async () => {
       _avg: { aiEtaMin: true, baseEtaMin: true },
       where: { status: ORDER_STATUS.DELIVERED },
     }),
+    // Total Users (customers)
+    prisma.user.count({
+      where: { role: 'CUSTOMER' },
+    }),
   ]);
 
   return {
@@ -65,6 +70,7 @@ export const getDashboardStats = async () => {
     activeDrivers,
     pendingDrivers,
     deliveredToday,
+    totalUsers,
     revenueToday: revenueToday._sum.totalFare || 0,
     avgDeliveryTimeMin: Math.round(avgDeliveryTime._avg.aiEtaMin || avgDeliveryTime._avg.baseEtaMin || 0),
   };
@@ -105,7 +111,7 @@ export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}
 };
 
 /**
- * Get all drivers with their approval status.
+ * Get all drivers with their approval status and real-time online/offline status.
  */
 export const getAllDrivers = async ({ approvalStatus } = {}) => {
   const where = {};
@@ -127,7 +133,68 @@ export const getAllDrivers = async ({ approvalStatus } = {}) => {
     orderBy: { user: { createdAt: 'desc' } },
   });
 
-  return drivers;
+  const driversWithStatus = await Promise.all(
+    drivers.map(async (d) => {
+      const redisStatus = await redis.get(REDIS_KEYS.DRIVER_STATUS(d.id));
+      const isOnline = redisStatus === DRIVER_STATUS.ONLINE || d.isActive === true;
+      return {
+        ...d,
+        isOnline,
+        status: isOnline ? 'ONLINE' : 'OFFLINE',
+      };
+    })
+  );
+
+  return driversWithStatus;
+};
+
+/**
+ * Get all users (customers) with order stats.
+ */
+export const getAllUsers = async () => {
+  const users = await prisma.user.findMany({
+    where: { role: 'CUSTOMER' },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phoneNumber: true,
+      createdAt: true,
+      _count: {
+        select: { customerOrders: true },
+      },
+      customerOrders: {
+        select: {
+          id: true,
+          totalFare: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return users.map((u) => {
+    const totalSpent = u.customerOrders.reduce((sum, o) => sum + (o.totalFare || 0), 0);
+    return {
+      id: u.id,
+      name: u.fullName || 'Khách hàng',
+      email: u.email,
+      phone: u.phoneNumber || '—',
+      ordersCount: u._count.customerOrders,
+      totalSpent,
+      status: 'ACTIVE',
+      createdAt: new Date(u.createdAt).toLocaleDateString('vi-VN'),
+      recentOrders: u.customerOrders.map((o) => ({
+        code: `#ORD-${o.id.slice(-8).toUpperCase()}`,
+        status: o.status,
+        fare: `${Number(o.totalFare || 0).toLocaleString('vi-VN')} đ`,
+      })),
+    };
+  });
 };
 
 /**
@@ -136,6 +203,8 @@ export const getAllDrivers = async ({ approvalStatus } = {}) => {
 export const getPendingDrivers = async () => {
   return getAllDrivers({ approvalStatus: APPROVAL_STATUS.PENDING });
 };
+
+import { emitDriverApprovalUpdated } from '../../sockets/socket.gateway.js';
 
 /**
  * Approve or reject a driver.
@@ -166,8 +235,17 @@ export const updateDriverApproval = async (driverId, adminUserId, action) => {
       approvedAt: new Date(),
     },
     include: {
-      user: { select: { fullName: true, email: true } },
+      user: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
     },
+  });
+
+  // Emit real-time socket event to driver
+  emitDriverApprovalUpdated(updated.userId, {
+    driverId: updated.id,
+    approvalStatus: updated.approvalStatus,
+    message: newStatus === APPROVAL_STATUS.APPROVED
+      ? 'Hồ sơ của bạn đã được Admin phê duyệt! Bạn có thể bật Online để nhận đơn ngay.'
+      : 'Hồ sơ đăng ký tài xế của bạn đã bị từ chối.',
   });
 
   return updated;

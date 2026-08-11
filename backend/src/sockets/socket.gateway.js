@@ -5,14 +5,17 @@ export const emitCustomerOrderStatus = (customerId, { orderId, status, label, dr
   try {
     const io = getIO();
     if (io) {
-      io.of('/customer').to(`customer:${customerId}`).emit('order:status-update', {
+      const payload = {
         orderId,
         status,
         label,
         driver,
         totalFare,
         timestamp: new Date().toISOString(),
-      });
+      };
+      const customerNs = io.of('/customer');
+      customerNs.to(`customer:${customerId}`).emit('order:status-update', payload);
+      customerNs.to(`user:${customerId}`).emit('order:status-update', payload);
     }
   } catch {
     // Socket not initialized in CLI test mode
@@ -43,12 +46,20 @@ export const emitDriverNewOrder = (driverIds, dispatchData) => {
     const io = getIO();
     if (io) {
       const driverNamespace = io.of('/driver');
+      // Broadcast to general online room
+      driverNamespace.to('drivers:online').emit('driver:new-order', dispatchData);
+
+      // Broadcast to vehicle type online room
+      if (dispatchData.vehicleType) {
+        driverNamespace.to(`drivers:online:${dispatchData.vehicleType}`).emit('driver:new-order', dispatchData);
+      }
+
+      // Targeted emit to specific driver & user rooms
       if (Array.isArray(driverIds) && driverIds.length > 0) {
-        driverIds.forEach((driverId) => {
-          driverNamespace.to(`driver:${driverId}`).emit('driver:new-order', dispatchData);
+        driverIds.forEach((id) => {
+          driverNamespace.to(`driver:${id}`).emit('driver:new-order', dispatchData);
+          driverNamespace.to(`user:${id}`).emit('driver:new-order', dispatchData);
         });
-      } else {
-        driverNamespace.to('drivers:online').emit('driver:new-order', dispatchData);
       }
     }
   } catch {
@@ -85,10 +96,68 @@ export const emitAdminDriverAccepted = (orderId, driverInfo) => {
   }
 };
 
+export const emitDriverOrderConfirmed = (driverId, orderData) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.of('/driver').to(`driver:${driverId}`).emit('order-confirmed', orderData);
+    }
+  } catch {
+    // Socket not initialized in CLI test mode
+  }
+};
+
+export const emitAdminNewDriverRegistered = (driverData) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.of('/admin').to('admin:notifications').emit('admin:new-driver-registered', driverData);
+    }
+  } catch {
+    // Socket not initialized in CLI test mode
+  }
+};
+
+export const emitDriverApprovalUpdated = (userId, approvalData) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.of('/driver').to(`user:${userId}`).emit('driver:approval-updated', approvalData);
+      if (approvalData.driverId) {
+        io.of('/driver').to(`driver:${approvalData.driverId}`).emit('driver:approval-updated', approvalData);
+      }
+    }
+  } catch {
+    // Socket not initialized in CLI test mode
+  }
+};
+
+export const emitAdminOrderStatusUpdate = (orderId, { status, label, driver, totalFare }) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.of('/admin').to('admin:notifications').emit('admin:order-status-update', {
+        orderId,
+        status,
+        label,
+        driver,
+        totalFare,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch {
+    // Socket not initialized in CLI test mode
+  }
+};
+
 export default {
   emitCustomerOrderStatus,
   emitAdminNewOrderRequest,
   emitDriverNewOrder,
   emitDriverOrderTaken,
   emitAdminDriverAccepted,
+  emitAdminOrderStatusUpdate,
+  emitDriverOrderConfirmed,
+  emitAdminNewDriverRegistered,
+  emitDriverApprovalUpdated,
 };

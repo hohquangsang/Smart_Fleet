@@ -31,6 +31,15 @@ export const getDrivers = catchAsync(async (req, res) => {
   });
 });
 
+export const getUsers = catchAsync(async (_req, res) => {
+  const users = await adminService.getAllUsers();
+
+  res.status(200).json({
+    success: true,
+    data: { users },
+  });
+});
+
 export const getPendingDrivers = catchAsync(async (_req, res) => {
   const drivers = await adminService.getPendingDrivers();
 
@@ -41,7 +50,7 @@ export const getPendingDrivers = catchAsync(async (_req, res) => {
 });
 
 export const approveDriver = catchAsync(async (req, res) => {
-  const { action } = req.body;
+  const action = req.body.action || (req.body.status === 'APPROVED' ? 'approve' : 'reject');
   const driver = await adminService.updateDriverApproval(
     req.params.id,
     req.user.id,

@@ -12,6 +12,7 @@ router.use(auth);
 router.use(authorize(ROLES.DRIVER));
 
 router.get('/me', driverController.getProfile);
+router.get('/earnings', driverController.getEarnings);
 router.patch('/status', validate(toggleStatusSchema), driverController.toggleStatus);
 router.post('/orders/:id/accept', driverController.acceptOrder);
 

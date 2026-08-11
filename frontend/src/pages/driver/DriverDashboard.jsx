@@ -1,33 +1,144 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiOutlineLightningBolt, HiOutlineTrendingUp, HiOutlineMap, HiOutlineCheckCircle, HiOutlineExclamationCircle } from 'react-icons/hi';
 import useAuth from '../../hooks/useAuth';
 import useToast from '../../hooks/useToast';
+import { SocketContext } from '../../contexts/SocketContext';
+import api from '../../services/api';
 import '../../styles/driver.css';
 
 const DriverDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  const socket = useContext(SocketContext);
 
-  // Check driver approval status (mocked or real user.driver)
-  const approvalStatus = user?.driver?.approvalStatus || 'APPROVED'; // default to APPROVED for full demo
+  const [approvalStatus, setApprovalStatus] = useState(user?.driver?.approvalStatus || 'PENDING');
   const isApproved = approvalStatus === 'APPROVED';
+  const [isOnline, setIsOnline] = useState(false);
 
-  const [isOnline, setIsOnline] = useState(isApproved);
+  const [quickStats, setQuickStats] = useState({
+    todayEarnings: 0,
+    todayBase: 0,
+    todayBonus: 0,
+    todayTripsCount: 0,
+    acceptRate: 100,
+    completeRate: 100,
+    rating: 5.0,
+  });
 
-  const handleToggleOnline = () => {
+  // Fetch driver profile & quick stats on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data } = await api.get('/drivers/me');
+        const driverObj = data?.data?.driver || data?.data;
+        if (driverObj) {
+          if (driverObj.approvalStatus) {
+            setApprovalStatus(driverObj.approvalStatus);
+          }
+          const activeState = Boolean(driverObj.isActive || driverObj.status === 'ONLINE');
+          setIsOnline(activeState);
+          if (activeState && socket) {
+            socket.emit('go-online', { lat: 10.7769, lng: 106.7009 });
+          }
+        }
+
+        const earningsRes = await api.get('/drivers/earnings', { params: { period: 'day' } });
+        if (earningsRes?.data?.data) {
+          const d = earningsRes.data.data;
+          setQuickStats({
+            todayEarnings: d.todayEarnings || 0,
+            todayBase: d.todayBase || 0,
+            todayBonus: d.todayBonus || 0,
+            todayTripsCount: d.todayTripsCount || 0,
+            acceptRate: d.acceptRate || 100,
+            completeRate: d.completeRate || 100,
+            rating: d.driver?.rating || 5.0,
+          });
+        }
+      } catch {
+        // Fallback to initial state
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  // Sync socket online state when socket becomes available
+  useEffect(() => {
+    if (socket && isOnline && isApproved) {
+      console.log('🟢 [Driver] Syncing online status to socket');
+      socket.emit('go-online', { lat: 10.7769, lng: 106.7009 });
+    }
+  }, [socket, isOnline, isApproved]);
+
+  // Real-time socket listener for Admin Approval & New Order Dispatch
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleApprovalUpdated = (data) => {
+      console.log('🔔 [Driver] driver:approval-updated received:', data);
+      setApprovalStatus(data.approvalStatus);
+
+      if (data.approvalStatus === 'APPROVED') {
+        toast.success(
+          data.message || 'Hồ sơ của bạn đã được Admin phê duyệt! Bạn đã có thể bật Online và nhận đơn.',
+          '🎉 Đã Phê Duyệt Hồ Sơ'
+        );
+      } else if (data.approvalStatus === 'REJECTED') {
+        toast.error(
+          data.message || 'Hồ sơ tài xế của bạn đã bị từ chối.',
+          '❌ Hồ Sơ Bị Từ Chối'
+        );
+      }
+    };
+
+    const handleNewOrder = (data) => {
+      console.log('🔥 [Driver] driver:new-order received on Dashboard:', data);
+      toast.info('⚡ BẠN CÓ ĐƠN HÀNG MỚI! Đang mở trạm nhận đơn...', 'Đơn Hàng Mới');
+      navigate('/driver/dispatch', { state: { dispatchData: data } });
+    };
+
+    socket.on('driver:approval-updated', handleApprovalUpdated);
+    socket.on('driver:new-order', handleNewOrder);
+
+    return () => {
+      socket.off('driver:approval-updated', handleApprovalUpdated);
+      socket.off('driver:new-order', handleNewOrder);
+    };
+  }, [socket, toast, navigate]);
+
+  const handleToggleOnline = async () => {
     if (!isApproved) {
-      toast.warning('Tài khoản của bạn đang chờ Admin phê duyệt. Chưa thể bật Online!', 'Tài khoản chưa duyệt');
+      toast.warning('Tài khoản của bạn đang chờ Admin duyệt hồ sơ. Vui lòng đợi!', 'Tài khoản chưa duyệt');
       return;
     }
 
     const nextState = !isOnline;
-    setIsOnline(nextState);
-    if (nextState) {
-      toast.success('Đã bật trạng thái ONLINE. Đang kết nối Socket.IO & định vị GPS...', 'Sẵn sàng nhận đơn');
-    } else {
-      toast.info('Đã tắt trạng thái ONLINE. Tạm ngưng nhận đơn mới.', 'Nghỉ ngơi');
+
+    try {
+      if (nextState) {
+        // Default HCM center coords if navigator geolocation is delayed
+        const lat = 10.7769;
+        const lng = 106.7009;
+
+        if (socket) {
+          socket.emit('go-online', { lat, lng });
+        }
+        await api.patch('/drivers/status', { lat, lng }).catch(() => {});
+        setIsOnline(true);
+        toast.success('Đã bật ONLINE! Bạn sẵn sàng nhận đơn từ hệ thống SmartFleet.', 'ONLINE');
+      } else {
+        if (socket) {
+          socket.emit('go-offline');
+        }
+        await api.patch('/drivers/status', {}).catch(() => {});
+        setIsOnline(false);
+        toast.info('Đã tắt ONLINE (OFFLINE). Tạm ngưng nhận đơn mới.', 'OFFLINE');
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể thay đổi trạng thái';
+      toast.error(msg, 'Lỗi');
     }
   };
 
@@ -166,9 +277,9 @@ const DriverDashboard = () => {
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase' }}>
               THU NHẬP HÔM NAY
             </span>
-            <div className="quick-earnings-amount">850.000 đ</div>
+            <div className="quick-earnings-amount">{(quickStats.todayEarnings || 0).toLocaleString('vi-VN')} đ</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600, marginTop: 4 }}>
-              ▲ +18% so với hôm qua (12 chuyến)
+              ▲ {quickStats.todayTripsCount || 0} chuyến hôm nay
             </div>
           </div>
 
@@ -176,13 +287,13 @@ const DriverDashboard = () => {
             <div className="earnings-sub-box">
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>CƯỚC CƠ BẢN</span>
               <span className="earnings-sub-val" style={{ color: 'var(--accent-blue)' }}>
-                720.000 đ
+                {(quickStats.todayBase || 0).toLocaleString('vi-VN')} đ
               </span>
             </div>
             <div className="earnings-sub-box">
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>THƯỞNG HIỆU SUẤT</span>
               <span className="earnings-sub-val" style={{ color: 'var(--accent-green)' }}>
-                130.000 đ
+                {(quickStats.todayBonus || 0).toLocaleString('vi-VN')} đ
               </span>
             </div>
           </div>
@@ -201,18 +312,18 @@ const DriverDashboard = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Tỷ lệ nhận đơn:</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                96%
+                {quickStats.acceptRate || 100}%
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Tỷ lệ hoàn thành:</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-green)' }}>
-                99%
+                {quickStats.completeRate || 100}%
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Đánh giá sao:</span>
-              <span style={{ color: '#F5A623', fontWeight: 700 }}>★ 4.9 / 5.0</span>
+              <span style={{ color: '#F5A623', fontWeight: 700 }}>★ {(quickStats.rating || 5.0).toFixed(1)} / 5.0</span>
             </div>
           </div>
 

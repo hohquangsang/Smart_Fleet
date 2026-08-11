@@ -243,7 +243,7 @@ const CreateOrderPage = () => {
 
     setIsSubmitting(true);
     try {
-      await api.post('/orders', {
+      const { data } = await api.post('/orders', {
         pickupAddress,
         pickupLat,
         pickupLng,
@@ -253,9 +253,12 @@ const CreateOrderPage = () => {
         vehicleType: selectedVehicle,
       });
 
+      // Lấy orderId từ response để navigate tracking
+      const orderId = data?.data?.order?.id;
+
       toast.success('ĐẶT ĐƠN THÀNH CÔNG! Đang chuyển hướng sang trang Theo dõi Real-time...', 'Thành công');
       setTimeout(() => {
-        navigate('/customer/tracking');
+        navigate(orderId ? `/customer/tracking?orderId=${orderId}` : '/customer/tracking');
       }, 600);
     } catch {
       // Mock fallback if offline

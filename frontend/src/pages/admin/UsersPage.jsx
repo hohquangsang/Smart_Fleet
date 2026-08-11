@@ -4,54 +4,9 @@ import api from '../../services/api';
 import useToast from '../../hooks/useToast';
 import '../../styles/admin.css';
 
-const MOCK_USERS = [
-  {
-    id: 'u1',
-    name: 'Hồ Hữu Quang Sang',
-    email: 'Hohuuquangsang2004@gmail.com',
-    phone: '0958.758.052',
-    ordersCount: 24,
-    totalSpent: 4850000,
-    status: 'ACTIVE',
-    createdAt: '15/05/2026',
-    recentOrders: [
-      { code: '#ORD-88294', status: 'MATCHED', fare: '145.000 đ' },
-      { code: '#ORD-88100', status: 'DELIVERED', fare: '380.000 đ' },
-      { code: '#ORD-87990', status: 'DELIVERED', fare: '210.000 đ' },
-    ],
-  },
-  {
-    id: 'u2',
-    name: 'Lê Thị Mai',
-    email: 'lethimai@gmail.com',
-    phone: '0903.111.222',
-    ordersCount: 18,
-    totalSpent: 3200000,
-    status: 'ACTIVE',
-    createdAt: '20/06/2026',
-    recentOrders: [
-      { code: '#ORD-88012', status: 'DELIVERED', fare: '160.000 đ' },
-      { code: '#ORD-87850', status: 'DELIVERED', fare: '125.000 đ' },
-    ],
-  },
-  {
-    id: 'u3',
-    name: 'Trần Văn Bằng',
-    phone: '0988.444.555',
-    email: 'tranvanbang@gmail.com',
-    ordersCount: 5,
-    totalSpent: 890000,
-    status: 'BLOCKED',
-    createdAt: '10/07/2026',
-    recentOrders: [
-      { code: '#ORD-87110', status: 'CANCELLED', fare: '180.000 đ' },
-    ],
-  },
-];
-
 const UsersPage = () => {
   const toast = useToast();
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
@@ -60,30 +15,15 @@ const UsersPage = () => {
   const [blockReason, setBlockReason] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  // Fetch real users from backend if available
+  // Fetch real users from backend
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const { data } = await api.get('/admin/users');
-        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
-          const mapped = data.data.map((u) => ({
-            id: u.id,
-            name: u.fullName || 'Người Dùng SmartFleet',
-            email: u.email || 'user@example.com',
-            phone: u.phoneNumber || '0900000000',
-            ordersCount: u._count?.customerOrders || 12,
-            totalSpent: 2450000,
-            status: u.isBlocked ? 'BLOCKED' : 'ACTIVE',
-            createdAt: new Date(u.createdAt || Date.now()).toLocaleDateString('vi-VN'),
-            recentOrders: [
-              { code: '#ORD-88294', status: 'DELIVERED', fare: '145.000 đ' },
-              { code: '#ORD-88100', status: 'DELIVERED', fare: '380.000 đ' },
-            ],
-          }));
-          setUsers(mapped);
-        }
+        const userList = data?.data?.users || (Array.isArray(data?.data) ? data.data : []);
+        setUsers(userList);
       } catch {
-        // Fallback to MOCK_USERS
+        setUsers([]);
       }
     };
     fetchUsers();

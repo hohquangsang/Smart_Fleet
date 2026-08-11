@@ -2,6 +2,8 @@ import redis from '../../config/redis.js';
 import { orderQueue } from '../../queues/order.queue.js';
 import { REDIS_KEYS } from '../../utils/constants.js';
 
+import prisma from '../../config/database.js';
+
 /**
  * Register a driver as Online in Redis for their vehicleType.
  */
@@ -20,10 +22,25 @@ export const unregisterOnlineDriver = async (driverId, vehicleType = 'motorcycle
 
 /**
  * Get all online driver IDs for a specific vehicle type.
+ * Combines Redis online set and DB active drivers to guarantee no driver is missed.
  */
 export const getOnlineDriverIds = async (vehicleType = 'motorcycle') => {
   const key = REDIS_KEYS.DRIVERS_ONLINE_VEHICLE(vehicleType);
-  return redis.smembers(key);
+  const redisDriverIds = await redis.smembers(key);
+
+  const dbActiveDrivers = await prisma.driver.findMany({
+    where: {
+      isActive: true,
+      approvalStatus: 'APPROVED',
+      vehicleType: { equals: vehicleType, mode: 'insensitive' },
+    },
+    select: { id: true, userId: true },
+  });
+
+  const dbDriverIds = dbActiveDrivers.map((d) => d.id);
+  const dbUserIds = dbActiveDrivers.map((d) => d.userId);
+  const combinedSet = new Set([...redisDriverIds, ...dbDriverIds, ...dbUserIds]);
+  return Array.from(combinedSet);
 };
 
 /**

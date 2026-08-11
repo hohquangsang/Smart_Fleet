@@ -5,6 +5,8 @@ import env from '../../config/env.js';
 import { UnauthorizedError, ConflictError, BadRequestError } from '../../utils/api-error.js';
 import { ROLES, APPROVAL_STATUS } from '../../utils/constants.js';
 
+import { emitAdminNewDriverRegistered } from '../../sockets/socket.gateway.js';
+
 /**
  * Generate JWT access + refresh token pair.
  */
@@ -57,6 +59,7 @@ export const register = async (data) => {
   const passwordHash = await bcrypt.hash(password, 12);
 
   // Create user + driver (if DRIVER role) in a transaction
+  let createdDriver = null;
   const user = await prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
       data: {
@@ -69,7 +72,7 @@ export const register = async (data) => {
     });
 
     if (role === ROLES.DRIVER) {
-      await tx.driver.create({
+      createdDriver = await tx.driver.create({
         data: {
           userId: newUser.id,
           vehicleType,
@@ -82,16 +85,43 @@ export const register = async (data) => {
     return newUser;
   });
 
+  if (createdDriver) {
+    // Notify admin real-time about new pending driver registration
+    emitAdminNewDriverRegistered({
+      id: createdDriver.id,
+      userId: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      vehicleType: createdDriver.vehicleType,
+      licensePlate: createdDriver.licensePlate,
+      approvalStatus: APPROVAL_STATUS.PENDING,
+      createdAt: user.createdAt,
+    });
+  }
+
   const tokens = generateTokens(user);
 
+  const responseUser = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    fullName: user.fullName,
+    phoneNumber: user.phoneNumber,
+  };
+
+  if (createdDriver) {
+    responseUser.driver = {
+      id: createdDriver.id,
+      vehicleType: createdDriver.vehicleType,
+      licensePlate: createdDriver.licensePlate,
+      approvalStatus: createdDriver.approvalStatus,
+      rating: createdDriver.rating || 5.0,
+    };
+  }
+
   return {
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      fullName: user.fullName,
-      phoneNumber: user.phoneNumber,
-    },
+    user: responseUser,
     ...tokens,
   };
 };

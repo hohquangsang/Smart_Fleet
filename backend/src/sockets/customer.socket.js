@@ -11,9 +11,10 @@ export const setupCustomerSocket = (customerNamespace) => {
       return;
     }
 
-    // Join user-specific room
+    // Join user-specific & customer-specific room
     socket.join(`user:${userId}`);
-    console.log(`👤 Customer connected: ${userId}`);
+    socket.join(`customer:${userId}`);
+    console.log(`👤 Customer connected: ${userId} (joined rooms user:${userId}, customer:${userId})`);
 
     // ─── Track Order ───────────────────────────
     socket.on('track-order', ({ orderId }) => {

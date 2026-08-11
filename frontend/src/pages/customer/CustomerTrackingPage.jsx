@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { HiOutlinePhone, HiOutlineChatAlt, HiOutlineCheckCircle, HiOutlineExclamation, HiOutlineX } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
+import { SocketContext } from '../../contexts/SocketContext';
 import '../../styles/customer.css';
 
 const STEPS = [
   { key: 'PENDING', label: 'Đang tìm tài xế' },
+  { key: 'DISPATCHING', label: 'Đang phân phối tài xế' },
+  { key: 'DRIVER_ACCEPTED', label: 'Tài xế đã nhận đơn' },
   { key: 'MATCHED', label: 'Tài xế đang đến' },
-  { key: 'PICKED_UP', label: 'Đã lấy hàng' },
+  { key: 'IN_TRANSIT', label: 'ĐANG GIAO' },
   { key: 'DELIVERED', label: 'Đã hoàn thành' },
 ];
 
@@ -70,26 +73,42 @@ const CustomerTrackingPage = () => {
   const toast = useToast();
 
   const [order, setOrder] = useState(null);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0); // Default to 0 (PENDING) "Đang tìm tài xế"
+  const [driverInfo, setDriverInfo] = useState(null); // thông tin tài xế từ socket
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [orderStatus, setOrderStatus] = useState('PENDING');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
   const [cancelNote, setCancelNote] = useState('');
   const [canceling, setCanceling] = useState(false);
+  const socket = useContext(SocketContext);
 
   // Live GPS vehicle position simulation
   const [vehicleCoords, setVehicleCoords] = useState([10.768, 106.685]);
 
-  // Fetch active order details & poll for status changes (PENDING -> MATCHED)
+  // statusMap đầy đủ các trạng thái
+  const STATUS_MAP = {
+    PENDING: 0,
+    DISPATCHING: 1,
+    DRIVER_ACCEPTED: 2,
+    MATCHED: 3,
+    IN_TRANSIT: 4,
+    PICKED_UP: 4,
+    DELIVERED: 5,
+    CANCELLED: -1,
+  };
+
+  // Fetch active order details khi load trang
   useEffect(() => {
     const fetchOrder = async () => {
       if (!orderId) return;
       try {
         const { data } = await api.get(`/orders/${orderId}`);
-        const orderData = data.data;
+        const orderData = data.data?.order || data.data;
         setOrder(orderData);
+        setOrderStatus(orderData.status);
+        if (orderData.driver) setDriverInfo(orderData.driver);
 
-        const statusMap = { PENDING: 0, MATCHED: 1, PICKED_UP: 2, DELIVERED: 3, CANCELLED: -1 };
-        const idx = statusMap[orderData.status];
+        const idx = STATUS_MAP[orderData.status];
         if (idx !== undefined && idx >= 0) {
           setCurrentStepIndex(idx);
         }
@@ -99,9 +118,54 @@ const CustomerTrackingPage = () => {
     };
 
     fetchOrder();
-    const pollInterval = setInterval(fetchOrder, 3000);
+    // Poll mỗi 5s như backup (socket là primary)
+    const pollInterval = setInterval(fetchOrder, 5000);
     return () => clearInterval(pollInterval);
-  }, [orderId]);
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lắng nghe socket order:status-update (real-time primary source)
+  useEffect(() => {
+    if (!socket || !orderId) return;
+
+    const handleStatusUpdate = (data) => {
+      if (data.orderId !== orderId) return;
+
+      console.log('📦 [Customer] order:status-update received:', data);
+
+      setOrderStatus(data.status);
+      const idx = STATUS_MAP[data.status];
+      if (idx !== undefined && idx >= 0) {
+        setCurrentStepIndex(idx);
+      }
+
+      if (data.driver) {
+        setDriverInfo(data.driver);
+      }
+
+      // Hiển thị toast thông báo
+      const statusMessages = {
+        DISPATCHING: '🔍 Hệ thống đang tìm tài xế phù hợp...',
+        DRIVER_ACCEPTED: '🤝 Tài xế đã nhận đơn hàng của bạn!',
+        MATCHED: '🚗 Tài xế đang trên đường đến lấy hàng!',
+        IN_TRANSIT: '🚚 Đơn hàng ĐANG GIAO đến bạn!',
+        DELIVERED: '✅ Đơn hàng đã được giao thành công!',
+        CANCELLED: '❌ Đơn hàng đã bị hủy.',
+      };
+      if (statusMessages[data.status]) {
+        toast.info(statusMessages[data.status], 'Cập nhật trạng thái');
+      }
+    };
+
+    socket.on('order:status-update', handleStatusUpdate);
+    // Join room theo dõi đơn hàng cụ thể
+    socket.emit('track-order', { orderId });
+
+    return () => {
+      socket.off('order:status-update', handleStatusUpdate);
+      socket.emit('stop-tracking', { orderId });
+    };
+  }, [socket, orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // Smooth vehicle movement animation
   useEffect(() => {

@@ -51,6 +51,16 @@ export const confirmMatchOrder = catchAsync(async (req, res) => {
   });
 });
 
+export const startTrip = catchAsync(async (req, res) => {
+  const order = await orderService.startTrip(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Trip started — status is now ĐANG GIAO',
+    data: { order },
+  });
+});
+
 export const getOrders = catchAsync(async (req, res) => {
   const { page, limit, status } = req.query;
 
@@ -83,6 +93,15 @@ export const cancelOrder = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Order cancelled',
+    data: { order },
+  });
+});
+
+export const getAvailableDispatchOrder = catchAsync(async (req, res) => {
+  const order = await orderService.getAvailableDispatchOrder(req.user.id);
+
+  res.status(200).json({
+    success: true,
     data: { order },
   });
 });

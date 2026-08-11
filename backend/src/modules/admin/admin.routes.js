@@ -15,6 +15,7 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/orders', validate(ordersQuerySchema, 'query'), adminController.getOrders);
 router.get('/drivers', adminController.getDrivers);
 router.get('/drivers/pending', adminController.getPendingDrivers);
+router.get('/users', adminController.getUsers);
 router.patch('/drivers/:id/approve', validate(approveDriverSchema), adminController.approveDriver);
 router.get('/analytics', adminController.getAnalytics);
 

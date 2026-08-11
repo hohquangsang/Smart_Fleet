@@ -4,7 +4,7 @@ import { getRouteWithCache } from '../../services/ors-cache.service.js';
 import { predictETA } from '../../services/ai.service.js';
 import { calculateFare } from '../../utils/fare-calculator.js';
 import { NotFoundError, BadRequestError, ForbiddenError, ConflictError } from '../../utils/api-error.js';
-import { ORDER_STATUS, ACTOR_TYPE, REDIS_KEYS } from '../../utils/constants.js';
+import { ORDER_STATUS, ACTOR_TYPE, REDIS_KEYS, DRIVER_STATUS } from '../../utils/constants.js';
 import { transitionOrderStatus } from './order-status.service.js';
 import {
   getOnlineDriverIds,
@@ -17,6 +17,8 @@ import {
   emitDriverNewOrder,
   emitDriverOrderTaken,
   emitAdminDriverAccepted,
+  emitAdminOrderStatusUpdate,
+  emitDriverOrderConfirmed,
 } from '../../sockets/socket.gateway.js';
 
 /**
@@ -119,8 +121,8 @@ export const dispatchOrder = async (orderId, adminUserId) => {
   // Emit driver:new-order offer to online drivers
   emitDriverNewOrder(onlineDriverIds, {
     orderId: order.id,
-    fare: order.totalFare,
-    distanceKm: order.distanceKm,
+    fare: Number(order.totalFare),
+    distanceKm: Number(order.distanceKm),
     etaMin: order.aiEtaMin || order.baseEtaMin,
     pickupAddress: order.pickupAddress,
     dropoffAddress: order.dropoffAddress,
@@ -161,8 +163,8 @@ export const acceptOrder = async (orderId, driverUserId) => {
     throw new ConflictError('Đơn không còn sẵn sàng để nhận');
   }
 
-  // Transition to DRIVER_ACCEPTED
-  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.DRIVER_ACCEPTED, {
+  // Transition directly to IN_TRANSIT ("ĐANG GIAO") upon driver acceptance
+  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
     actorType: ACTOR_TYPE.DRIVER,
     actorId: driver.id,
     driverId: driver.id,
@@ -171,16 +173,36 @@ export const acceptOrder = async (orderId, driverUserId) => {
   // Clear 30s dispatch deadline
   await clearDispatchDeadline(orderId);
 
+  // Set driver status to ON_TRIP in Redis
+  await redis.set(REDIS_KEYS.DRIVER_STATUS(driver.id), DRIVER_STATUS.ON_TRIP);
+
+  const driverPayload = {
+    id: driver.id,
+    name: driver.user?.fullName || 'Tài xế SmartFleet',
+    phone: driver.user?.phoneNumber || '',
+    licensePlate: driver.licensePlate || '',
+    rating: driver.rating || 5.0,
+  };
+
   // Emit to other drivers to close dispatch bottom sheet
   emitDriverOrderTaken(orderId, driver.id);
 
-  // Emit to Admin panel for final confirmation
-  emitAdminDriverAccepted(orderId, {
-    id: driver.id,
-    name: driver.user?.fullName,
-    phone: driver.user?.phoneNumber,
-    licensePlate: driver.licensePlate,
-    rating: driver.rating,
+  // Emit to Admin panel: driver accepted & status is now IN_TRANSIT
+  emitAdminDriverAccepted(orderId, driverPayload);
+  emitAdminOrderStatusUpdate(orderId, {
+    status: ORDER_STATUS.IN_TRANSIT,
+    label: 'ĐANG GIAO',
+    driver: driverPayload,
+    totalFare: updatedOrder.totalFare,
+  });
+
+  // Emit to Customer: status is now IN_TRANSIT ("ĐANG GIAO") with full driver details
+  emitCustomerOrderStatus(updatedOrder.customerId, {
+    orderId: updatedOrder.id,
+    status: ORDER_STATUS.IN_TRANSIT,
+    label: 'ĐANG GIAO',
+    driver: driverPayload,
+    totalFare: updatedOrder.totalFare,
   });
 
   return updatedOrder;
@@ -225,7 +247,7 @@ export const confirmMatchOrder = async (orderId, adminUserId) => {
   emitCustomerOrderStatus(order.customerId, {
     orderId: order.id,
     status: ORDER_STATUS.MATCHED,
-    label: 'Đã nhận đơn',
+    label: 'Tài xế đang đến nhận hàng',
     driver: {
       id: order.driver?.id,
       name: order.driver?.user?.fullName || 'Nguyễn Văn Nam',
@@ -234,6 +256,68 @@ export const confirmMatchOrder = async (orderId, adminUserId) => {
       vehicleType: order.driver?.vehicleType || order.vehicleType,
       rating: order.driver?.rating || 4.9,
     },
+    totalFare: order.totalFare,
+  });
+
+  // Notify Driver: admin confirmed match, bắt đầu giao
+  if (order.driver) {
+    emitDriverOrderConfirmed(order.driver.id, {
+      orderId: order.id,
+      order: updatedOrder,
+      message: 'Admin đã xác nhận! Hãy đi đến lấy hàng và nhấn "Bắt đầu giao" khi xuất phát.',
+    });
+  }
+
+  return updatedOrder;
+};
+
+/**
+ * Step 5: Driver bắt đầu giao hàng (status = IN_TRANSIT = ĐANG GIAO).
+ * Emits order:status-update "ĐANG GIAO" đến Customer.
+ */
+export const startTrip = async (orderId, driverUserId) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId: driverUserId },
+  });
+  if (!driver) throw new NotFoundError('Driver profile not found');
+
+  const order = await getOrderById(orderId);
+
+  if (order.driverId !== driver.id) {
+    throw new ForbiddenError('Bạn không phải tài xế của đơn hàng này');
+  }
+
+  if (order.status !== ORDER_STATUS.MATCHED) {
+    throw new BadRequestError(`Không thể bắt đầu giao khi đơn đang ở trạng thái ${order.status}`);
+  }
+
+  // MATCHED → IN_TRANSIT
+  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
+    actorType: ACTOR_TYPE.DRIVER,
+    actorId: driver.id,
+  });
+
+  const driverPayload = {
+    id: driver.id,
+    name: order.driver?.user?.fullName || driver.user?.fullName || 'Tài xế SmartFleet',
+    phone: order.driver?.user?.phoneNumber || driver.user?.phoneNumber || '',
+    licensePlate: order.driver?.licensePlate || driver.licensePlate || '',
+    rating: order.driver?.rating || driver.rating || 5.0,
+  };
+
+  // Emit to Customer & Admin: ĐANG GIAO
+  emitCustomerOrderStatus(order.customerId, {
+    orderId,
+    status: ORDER_STATUS.IN_TRANSIT,
+    label: 'ĐANG GIAO',
+    driver: driverPayload,
+    totalFare: order.totalFare,
+  });
+
+  emitAdminOrderStatusUpdate(orderId, {
+    status: ORDER_STATUS.IN_TRANSIT,
+    label: 'ĐANG GIAO',
+    driver: driverPayload,
     totalFare: order.totalFare,
   });
 
@@ -343,4 +427,45 @@ export const cancelOrder = async (orderId, actorUserId, actorType = ACTOR_TYPE.C
   });
 
   return updatedOrder;
+};
+
+/**
+ * Get currently active DISPATCHING order for driver (if available for their vehicleType).
+ */
+export const getAvailableDispatchOrder = async (driverUserId) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId: driverUserId },
+  });
+
+  if (!driver) return null;
+
+  // Find latest order in DISPATCHING status for driver's vehicleType
+  const activeOrder = await prisma.order.findFirst({
+    where: {
+      status: ORDER_STATUS.DISPATCHING,
+      OR: [
+        { vehicleType: { equals: driver.vehicleType || 'motorcycle', mode: 'insensitive' } },
+        { vehicleType: null },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!activeOrder) return null;
+
+  // Calculate remaining TTL from Redis
+  const deadlineKey = REDIS_KEYS.DISPATCH_DEADLINE(activeOrder.id);
+  const ttl = await redis.ttl(deadlineKey);
+  const expiresInSec = ttl > 0 ? ttl : 30;
+
+  return {
+    orderId: activeOrder.id,
+    fare: Number(activeOrder.totalFare),
+    distanceKm: Number(activeOrder.distanceKm),
+    etaMin: activeOrder.aiEtaMin || activeOrder.baseEtaMin,
+    pickupAddress: activeOrder.pickupAddress,
+    dropoffAddress: activeOrder.dropoffAddress,
+    vehicleType: activeOrder.vehicleType,
+    expiresInSec,
+  };
 };
