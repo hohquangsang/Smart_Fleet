@@ -167,8 +167,8 @@ const DriverDispatchPage = () => {
         >
           <div style={{ fontSize: '2rem', marginBottom: 12 }}>📡</div>
           <div>Đang lắng nghe Socket.IO tìm đơn hàng tốt nhất xung quanh bạn...</div>
-          <div style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Đơn hàng sẽ hiện tự động khi Admin duyệt
+          <div style={{ marginTop: 8, fontSize: '1rem', color: 'var(--text-muted)' }}>
+            Đang phát triển...
           </div>
         </div>
       </div>

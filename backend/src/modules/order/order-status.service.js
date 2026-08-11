@@ -9,11 +9,11 @@ const VALID_TRANSITIONS = {
   [ORDER_STATUS.PENDING]: [ORDER_STATUS.DISPATCHING, ORDER_STATUS.CANCELLED, ORDER_STATUS.EXPIRED_NO_DRIVER],
   [ORDER_STATUS.DISPATCHING]: [ORDER_STATUS.DRIVER_ACCEPTED, ORDER_STATUS.IN_TRANSIT, ORDER_STATUS.CANCELLED, ORDER_STATUS.EXPIRED_NO_DRIVER],
   [ORDER_STATUS.DRIVER_ACCEPTED]: [ORDER_STATUS.IN_TRANSIT, ORDER_STATUS.MATCHED, ORDER_STATUS.CANCELLED, ORDER_STATUS.DISPATCHING],
-  [ORDER_STATUS.MATCHED]: [ORDER_STATUS.IN_TRANSIT, ORDER_STATUS.PICKED_UP, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.MATCHED]: [ORDER_STATUS.IN_TRANSIT, ORDER_STATUS.PICKED_UP, ORDER_STATUS.DELIVERED, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.IN_TRANSIT]: [ORDER_STATUS.COMPLETED, ORDER_STATUS.DELIVERED, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.PICKED_UP]: [ORDER_STATUS.DELIVERED, ORDER_STATUS.COMPLETED, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.COMPLETED]: [],
-  [ORDER_STATUS.DELIVERED]: [],
+  [ORDER_STATUS.DELIVERED]: [ORDER_STATUS.COMPLETED],
   [ORDER_STATUS.CANCELLED]: [],
   [ORDER_STATUS.EXPIRED_NO_DRIVER]: [ORDER_STATUS.DISPATCHING], // Allowed if admin retries dispatch
 };
@@ -28,9 +28,15 @@ const VALID_TRANSITIONS = {
  * @param {string} [options.actorId]
  * @param {string} [options.driverId]
  * @param {string} [options.cancelReason]
+ * @param {string} [options.proofImage]
+ * @param {number} [options.deliveredLat]
+ * @param {number} [options.deliveredLng]
+ * @param {number} [options.rating]
+ * @param {string} [options.ratingComment]
+ * @param {string[]} [options.ratingTags]
  * @returns {Promise<import('@prisma/client').Order>}
  */
-export const transitionOrderStatus = async (orderId, toStatus, { actorType = ACTOR_TYPE.SYSTEM, actorId = null, driverId = null, cancelReason = null } = {}) => {
+export const transitionOrderStatus = async (orderId, toStatus, { actorType = ACTOR_TYPE.SYSTEM, actorId = null, driverId = null, cancelReason = null, proofImage = null, deliveredLat = null, deliveredLng = null, rating = null, ratingComment = null, ratingTags = null } = {}) => {
   const currentOrder = await prisma.order.findUnique({ where: { id: orderId } });
   if (!currentOrder) {
     throw new BadRequestError('Order not found');
@@ -53,10 +59,17 @@ export const transitionOrderStatus = async (orderId, toStatus, { actorType = ACT
 
   if (driverId) updateData.driverId = driverId;
   if (cancelReason) updateData.cancelReason = cancelReason;
+  if (proofImage) updateData.proofImage = proofImage;
+  if (deliveredLat != null) updateData.deliveredLat = deliveredLat;
+  if (deliveredLng != null) updateData.deliveredLng = deliveredLng;
+  if (rating != null) updateData.rating = rating;
+  if (ratingComment != null) updateData.ratingComment = ratingComment;
+  if (ratingTags != null) updateData.ratingTags = ratingTags;
 
   if (toStatus === ORDER_STATUS.DISPATCHING) updateData.dispatchedAt = now;
   if (toStatus === ORDER_STATUS.DRIVER_ACCEPTED) updateData.acceptedAt = now;
   if (toStatus === ORDER_STATUS.MATCHED) updateData.matchedAt = now;
+  if (toStatus === ORDER_STATUS.DELIVERED || toStatus === ORDER_STATUS.COMPLETED) updateData.deliveredAt = now;
 
   // Run DB update and status history logging inside a transaction
   const [updatedOrder] = await prisma.$transaction([

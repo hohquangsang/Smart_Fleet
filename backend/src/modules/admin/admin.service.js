@@ -159,6 +159,10 @@ export const getAllUsers = async () => {
       fullName: true,
       email: true,
       phoneNumber: true,
+      isBlocked: true,
+      blockReason: true,
+      appealNote: true,
+      isAppealed: true,
       createdAt: true,
       _count: {
         select: { customerOrders: true },
@@ -186,7 +190,11 @@ export const getAllUsers = async () => {
       phone: u.phoneNumber || '—',
       ordersCount: u._count.customerOrders,
       totalSpent,
-      status: 'ACTIVE',
+      isBlocked: Boolean(u.isBlocked),
+      blockReason: u.blockReason || null,
+      appealNote: u.appealNote || null,
+      isAppealed: Boolean(u.isAppealed),
+      status: u.isBlocked ? 'BLOCKED' : 'ACTIVE',
       createdAt: new Date(u.createdAt).toLocaleDateString('vi-VN'),
       recentOrders: u.customerOrders.map((o) => ({
         code: `#ORD-${o.id.slice(-8).toUpperCase()}`,
@@ -195,6 +203,135 @@ export const getAllUsers = async () => {
       })),
     };
   });
+};
+
+/**
+ * Block a driver.
+ */
+export const blockDriver = async (driverId, reason) => {
+  if (!reason || !reason.trim()) {
+    throw new BadRequestError('Vui lòng nhập lý do khóa tài xế');
+  }
+
+  const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+  if (!driver) throw new NotFoundError('Driver not found');
+
+  const updated = await prisma.driver.update({
+    where: { id: driverId },
+    data: {
+      approvalStatus: APPROVAL_STATUS.BLOCKED,
+      rejectionReason: reason.trim(),
+      isActive: false,
+    },
+    include: { user: { select: { id: true, fullName: true, email: true, phoneNumber: true } } },
+  });
+
+  emitDriverApprovalUpdated(updated.userId, {
+    driverId: updated.id,
+    approvalStatus: 'BLOCKED',
+    rejectionReason: updated.rejectionReason,
+    message: `Tài khoản tài xế của bạn đã bị khóa bởi Admin. Lý do: "${updated.rejectionReason}". Vui lòng vào trang thông tin cá nhân để khiếu nại mở tài khoản.`,
+  });
+
+  return updated;
+};
+
+/**
+ * Unblock a driver.
+ */
+export const unblockDriver = async (driverId) => {
+  const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+  if (!driver) throw new NotFoundError('Driver not found');
+
+  const updated = await prisma.driver.update({
+    where: { id: driverId },
+    data: {
+      approvalStatus: APPROVAL_STATUS.APPROVED,
+      rejectionReason: null,
+      appealNote: null,
+      isAppealed: false,
+    },
+    include: { user: { select: { id: true, fullName: true, email: true, phoneNumber: true } } },
+  });
+
+  emitDriverApprovalUpdated(updated.userId, {
+    driverId: updated.id,
+    approvalStatus: 'APPROVED',
+    message: 'Tài khoản tài xế của bạn đã được Admin mở khóa! Bạn có thể truy cập các trang và nhận đơn bình thường.',
+  });
+
+  return updated;
+};
+
+/**
+ * Block a user (Customer).
+ */
+export const blockUser = async (userId, reason) => {
+  if (!reason || !reason.trim()) {
+    throw new BadRequestError('Vui lòng nhập lý do khóa tài khoản khách hàng');
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new NotFoundError('User not found');
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isBlocked: true,
+      blockReason: reason.trim(),
+    },
+  });
+
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    if (io) {
+      io.of('/customer').to(`customer:${user.id}`).emit('user:status-updated', {
+        userId: user.id,
+        isBlocked: true,
+        blockReason: updated.blockReason,
+        message: `Tài khoản của bạn đã bị khóa bởi Admin. Lý do: "${updated.blockReason}". Vui lòng vào trang thông tin cá nhân để gửi khiếu nại mở tài khoản.`,
+      });
+    }
+  } catch (err) {
+    console.error('Socket emit error on blockUser:', err);
+  }
+
+  return updated;
+};
+
+/**
+ * Unblock a user (Customer).
+ */
+export const unblockUser = async (userId) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new NotFoundError('User not found');
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isBlocked: false,
+      blockReason: null,
+      appealNote: null,
+      isAppealed: false,
+    },
+  });
+
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    if (io) {
+      io.of('/customer').to(`customer:${user.id}`).emit('user:status-updated', {
+        userId: user.id,
+        isBlocked: false,
+        message: 'Tài khoản của bạn đã được Admin mở khóa thành công! Bạn có thể đặt xe và truy cập các chức năng.',
+      });
+    }
+  } catch (err) {
+    console.error('Socket emit error on unblockUser:', err);
+  }
+
+  return updated;
 };
 
 /**
@@ -209,43 +346,98 @@ import { emitDriverApprovalUpdated } from '../../sockets/socket.gateway.js';
 /**
  * Approve or reject a driver.
  */
-export const updateDriverApproval = async (driverId, adminUserId, action) => {
+export const updateDriverApproval = async (driverId, adminUserId, action, rejectionReason = null) => {
   const driver = await prisma.driver.findUnique({
     where: { id: driverId },
-    include: { user: { select: { fullName: true } } },
+    include: { user: { select: { id: true, fullName: true, email: true, phoneNumber: true } } },
   });
 
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
 
-  if (driver.approvalStatus !== APPROVAL_STATUS.PENDING) {
-    throw new BadRequestError(`Driver has already been ${driver.approvalStatus.toLowerCase()}`);
+  const isReject = action === 'reject' || action === 'REJECTED';
+
+  if (isReject && (!rejectionReason || !rejectionReason.trim())) {
+    throw new BadRequestError('Vui lòng cung cấp lý do từ chối duyệt tài xế');
   }
 
-  const newStatus = action === 'approve'
-    ? APPROVAL_STATUS.APPROVED
-    : APPROVAL_STATUS.REJECTED;
+  if (isReject) {
+    const newRejectionCount = (driver.rejectionCount || 0) + 1;
 
+    // Check if this is the 2nd rejection after an appeal
+    if (newRejectionCount >= 2 || driver.isAppealed) {
+      // Emit socket notification to driver before deleting
+      emitDriverApprovalUpdated(driver.userId, {
+        driverId: driver.id,
+        approvalStatus: 'PERMANENTLY_REJECTED',
+        rejectionReason: rejectionReason.trim(),
+        rejectionCount: newRejectionCount,
+        message: `Hồ sơ khiếu nại của bạn bị từ chối lần 2 (${rejectionReason.trim()}). Tài khoản của bạn đã bị từ chối và xóa khỏi hệ thống.`,
+        deleted: true,
+      });
+
+      // Permanently delete driver & user account from DB
+      await prisma.user.delete({
+        where: { id: driver.userId },
+      });
+
+      return {
+        id: driver.id,
+        deleted: true,
+        rejectionCount: newRejectionCount,
+        rejectionReason: rejectionReason.trim(),
+        message: 'Tài xế bị từ chối lần 2 và tài khoản đã được xóa khỏi hệ thống.',
+      };
+    }
+
+    // 1st Rejection: Update status to REJECTED and record reason
+    const updated = await prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        approvalStatus: APPROVAL_STATUS.REJECTED,
+        rejectionReason: rejectionReason.trim(),
+        rejectionCount: 1,
+        approvedBy: adminUserId,
+        approvedAt: new Date(),
+        isAppealed: false,
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
+      },
+    });
+
+    emitDriverApprovalUpdated(updated.userId, {
+      driverId: updated.id,
+      approvalStatus: updated.approvalStatus,
+      rejectionReason: updated.rejectionReason,
+      rejectionCount: 1,
+      message: `Hồ sơ đăng ký tài xế của bạn bị từ chối với lý do: "${updated.rejectionReason}". Vui lòng cập nhật lại thông tin và gửi khiếu nại để Admin xem xét lại.`,
+    });
+
+    return updated;
+  }
+
+  // Approval action
   const updated = await prisma.driver.update({
     where: { id: driverId },
     data: {
-      approvalStatus: newStatus,
+      approvalStatus: APPROVAL_STATUS.APPROVED,
       approvedBy: adminUserId,
       approvedAt: new Date(),
+      rejectionReason: null,
+      appealNote: null,
+      isAppealed: false,
     },
     include: {
       user: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
     },
   });
 
-  // Emit real-time socket event to driver
   emitDriverApprovalUpdated(updated.userId, {
     driverId: updated.id,
     approvalStatus: updated.approvalStatus,
-    message: newStatus === APPROVAL_STATUS.APPROVED
-      ? 'Hồ sơ của bạn đã được Admin phê duyệt! Bạn có thể bật Online để nhận đơn ngay.'
-      : 'Hồ sơ đăng ký tài xế của bạn đã bị từ chối.',
+    message: 'Hồ sơ của bạn đã được Admin phê duyệt! Bạn có thể bật Online để nhận đơn ngay.',
   });
 
   return updated;

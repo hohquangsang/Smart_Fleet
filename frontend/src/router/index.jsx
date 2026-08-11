@@ -8,10 +8,12 @@ import AdminOrdersPage from '../pages/admin/OrdersPage';
 import CreateOrderPage from '../pages/customer/CreateOrderPage';
 import CustomerTrackingPage from '../pages/customer/CustomerTrackingPage';
 import CustomerHistoryPage from '../pages/customer/CustomerHistoryPage';
+import CustomerProfilePage from '../pages/customer/CustomerProfilePage';
 import DriverDashboard from '../pages/driver/DriverDashboard';
 import DriverDispatchPage from '../pages/driver/DriverDispatchPage';
 import ActiveTripPage from '../pages/driver/ActiveTripPage';
 import EarningsProfilePage from '../pages/driver/EarningsProfilePage';
+import DriverProfilePage from '../pages/driver/DriverProfilePage';
 import { ProtectedRoute } from './ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -48,6 +50,7 @@ export const router = createBrowserRouter([
       { index: true, element: <CreateOrderPage /> },
       { path: 'tracking', element: <CustomerTrackingPage /> },
       { path: 'history', element: <CustomerHistoryPage /> },
+      { path: 'profile', element: <CustomerProfilePage /> },
       { path: 'orders', element: <Navigate to="/customer/history" replace /> },
       { path: 'invoices', element: <Navigate to="/customer/history" replace /> },
     ],
@@ -58,7 +61,7 @@ export const router = createBrowserRouter([
     path: '/driver',
     element: (
       <ProtectedRoute allowedRoles={['DRIVER']}>
-        <DashboardLayout title="SmartFleet Bàn Làm Việc Tài Xế" />
+        <DashboardLayout title="SmartFleet Driver" />
       </ProtectedRoute>
     ),
     children: [
@@ -66,6 +69,7 @@ export const router = createBrowserRouter([
       { path: 'dispatch', element: <DriverDispatchPage /> },
       { path: 'active', element: <ActiveTripPage /> },
       { path: 'earnings', element: <EarningsProfilePage /> },
+      { path: 'profile', element: <DriverProfilePage /> },
       { path: 'available', element: <Navigate to="/driver/dispatch" replace /> },
       { path: 'history', element: <Navigate to="/driver/earnings" replace /> },
     ],

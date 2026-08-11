@@ -163,8 +163,8 @@ export const acceptOrder = async (orderId, driverUserId) => {
     throw new ConflictError('Đơn không còn sẵn sàng để nhận');
   }
 
-  // Transition directly to IN_TRANSIT ("ĐANG GIAO") upon driver acceptance
-  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
+  // Transition to DRIVER_ACCEPTED upon driver acceptance
+  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.DRIVER_ACCEPTED, {
     actorType: ACTOR_TYPE.DRIVER,
     actorId: driver.id,
     driverId: driver.id,
@@ -187,20 +187,20 @@ export const acceptOrder = async (orderId, driverUserId) => {
   // Emit to other drivers to close dispatch bottom sheet
   emitDriverOrderTaken(orderId, driver.id);
 
-  // Emit to Admin panel: driver accepted & status is now IN_TRANSIT
+  // Emit to Admin panel: driver accepted & status is now DRIVER_ACCEPTED
   emitAdminDriverAccepted(orderId, driverPayload);
   emitAdminOrderStatusUpdate(orderId, {
-    status: ORDER_STATUS.IN_TRANSIT,
-    label: 'ĐANG GIAO',
+    status: ORDER_STATUS.DRIVER_ACCEPTED,
+    label: 'TÀI XẾ ĐÃ NHẬN ĐƠN',
     driver: driverPayload,
     totalFare: updatedOrder.totalFare,
   });
 
-  // Emit to Customer: status is now IN_TRANSIT ("ĐANG GIAO") with full driver details
+  // Emit to Customer: status is now DRIVER_ACCEPTED with full driver details
   emitCustomerOrderStatus(updatedOrder.customerId, {
     orderId: updatedOrder.id,
-    status: ORDER_STATUS.IN_TRANSIT,
-    label: 'ĐANG GIAO',
+    status: ORDER_STATUS.DRIVER_ACCEPTED,
+    label: 'Tài xế đã nhận đơn hàng — Đang di chuyển đến điểm lấy hàng',
     driver: driverPayload,
     totalFare: updatedOrder.totalFare,
   });
@@ -287,11 +287,7 @@ export const startTrip = async (orderId, driverUserId) => {
     throw new ForbiddenError('Bạn không phải tài xế của đơn hàng này');
   }
 
-  if (order.status !== ORDER_STATUS.MATCHED) {
-    throw new BadRequestError(`Không thể bắt đầu giao khi đơn đang ở trạng thái ${order.status}`);
-  }
-
-  // MATCHED → IN_TRANSIT
+  // MATCHED or DRIVER_ACCEPTED or IN_TRANSIT → IN_TRANSIT
   const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.IN_TRANSIT, {
     actorType: ACTOR_TYPE.DRIVER,
     actorId: driver.id,
@@ -325,9 +321,119 @@ export const startTrip = async (orderId, driverUserId) => {
 };
 
 /**
+ * Step 6: Driver hoàn thành giao hàng (status = DELIVERED = ĐÃ GIAO HÀNG).
+ * Accompanied with proofImage and delivered coordinates.
+ */
+export const completeTrip = async (orderId, driverUserId, { proofImage = null, deliveredLat = null, deliveredLng = null } = {}) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId: driverUserId },
+  });
+  if (!driver) throw new NotFoundError('Driver profile not found');
+
+  const order = await getOrderById(orderId);
+
+  if (order.driverId !== driver.id) {
+    throw new ForbiddenError('Bạn không phải tài xế của đơn hàng này');
+  }
+
+  // IN_TRANSIT or MATCHED → DELIVERED
+  const updatedOrder = await transitionOrderStatus(orderId, ORDER_STATUS.DELIVERED, {
+    actorType: ACTOR_TYPE.DRIVER,
+    actorId: driver.id,
+    proofImage,
+    deliveredLat,
+    deliveredLng,
+  });
+
+  // Set driver status back to ONLINE in Redis
+  await redis.set(REDIS_KEYS.DRIVER_STATUS(driver.id), DRIVER_STATUS.ONLINE);
+
+  const driverPayload = {
+    id: driver.id,
+    name: order.driver?.user?.fullName || driver.user?.fullName || 'Tài xế SmartFleet',
+    phone: order.driver?.user?.phoneNumber || driver.user?.phoneNumber || '',
+    licensePlate: order.driver?.licensePlate || driver.licensePlate || '',
+    rating: order.driver?.rating || driver.rating || 5.0,
+  };
+
+  // Emit to Customer & Admin: DELIVERED
+  emitCustomerOrderStatus(order.customerId, {
+    orderId,
+    status: ORDER_STATUS.DELIVERED,
+    label: 'ĐÃ GIAO HÀNG',
+    driver: driverPayload,
+    totalFare: order.totalFare,
+    proofImage,
+  });
+
+  emitAdminOrderStatusUpdate(orderId, {
+    status: ORDER_STATUS.DELIVERED,
+    label: 'ĐÃ GIAO HÀNG',
+    driver: driverPayload,
+    totalFare: order.totalFare,
+  });
+
+  return updatedOrder;
+};
+
+/**
+ * Step 7: Customer đánh giá chuyến xe (1-5 sao, nhận xét, tag nhanh).
+ * Updates Driver average rating in DB.
+ */
+export const rateOrder = async (orderId, customerUserId, { rating, comment, tags }) => {
+  const order = await getOrderById(orderId);
+
+  if (order.customerId !== customerUserId) {
+    throw new ForbiddenError('Bạn không phải khách hàng của đơn hàng này');
+  }
+
+  const numericRating = Math.max(1, Math.min(5, parseInt(rating, 10) || 5));
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      rating: numericRating,
+      ratingComment: comment || null,
+      ratingTags: Array.isArray(tags) ? tags : [],
+    },
+    include: {
+      driver: true,
+      customer: { select: { fullName: true, phoneNumber: true } },
+    },
+  });
+
+  // Recalculate driver average rating
+  if (order.driverId) {
+    const ratedOrders = await prisma.order.findMany({
+      where: {
+        driverId: order.driverId,
+        rating: { not: null },
+      },
+      select: { rating: true },
+    });
+
+    if (ratedOrders.length > 0) {
+      const avgRating = (
+        ratedOrders.reduce((sum, o) => sum + (o.rating || 5), 0) / ratedOrders.length
+      ).toFixed(2);
+
+      await prisma.driver.update({
+        where: { id: order.driverId },
+        data: { rating: parseFloat(avgRating) },
+      });
+    }
+  }
+
+  return updatedOrder;
+};
+
+/**
  * Get orders for a customer.
  */
 export const getCustomerOrders = async (customerId, { page = 1, limit = 20, status } = {}) => {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 20);
+
   const where = { customerId };
   if (status) where.status = status;
 
@@ -335,8 +441,8 @@ export const getCustomerOrders = async (customerId, { page = 1, limit = 20, stat
     prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
       include: {
         driver: {
           include: {
@@ -348,13 +454,16 @@ export const getCustomerOrders = async (customerId, { page = 1, limit = 20, stat
     prisma.order.count({ where }),
   ]);
 
-  return { orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return { orders, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) };
 };
 
 /**
  * Get orders for a driver.
  */
 export const getDriverOrders = async (userId, { page = 1, limit = 20, status } = {}) => {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 20);
+
   const driver = await prisma.driver.findUnique({ where: { userId } });
   if (!driver) throw new NotFoundError('Driver not found');
 
@@ -365,8 +474,8 @@ export const getDriverOrders = async (userId, { page = 1, limit = 20, status } =
     prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
       include: {
         customer: { select: { fullName: true, phoneNumber: true } },
       },
@@ -374,7 +483,7 @@ export const getDriverOrders = async (userId, { page = 1, limit = 20, status } =
     prisma.order.count({ where }),
   ]);
 
-  return { orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return { orders, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) };
 };
 
 /**

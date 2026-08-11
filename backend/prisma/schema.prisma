@@ -18,6 +18,10 @@ model User {
   role         UserRole
   fullName     String   @map("full_name") @db.VarChar(100)
   phoneNumber  String   @unique @map("phone_number") @db.VarChar(20)
+  isBlocked    Boolean  @default(false) @map("is_blocked")
+  blockReason  String?  @map("block_reason")
+  appealNote   String?  @map("appeal_note")
+  isAppealed   Boolean  @default(false) @map("is_appealed")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -42,11 +46,17 @@ model Driver {
   userId         String         @unique @map("user_id") @db.Uuid
   vehicleType    String         @map("vehicle_type") @db.VarChar(50)
   licensePlate   String         @unique @map("license_plate") @db.VarChar(20)
+  licenseImage   String?        @map("license_image")
+  cccdImage      String?        @map("cccd_image")
   rating         Decimal        @default(5.00) @db.Decimal(3, 2)
   isActive       Boolean        @default(true) @map("is_active")
-  approvalStatus ApprovalStatus @default(PENDING) @map("approval_status")
-  approvedBy     String?        @map("approved_by") @db.Uuid
-  approvedAt     DateTime?      @map("approved_at") @db.Timestamptz()
+  approvalStatus  ApprovalStatus @default(PENDING) @map("approval_status")
+  approvedBy      String?        @map("approved_by") @db.Uuid
+  approvedAt      DateTime?      @map("approved_at") @db.Timestamptz()
+  rejectionReason String?        @map("rejection_reason")
+  rejectionCount  Int            @default(0) @map("rejection_count")
+  appealNote      String?        @map("appeal_note")
+  isAppealed      Boolean        @default(false) @map("is_appealed")
 
   // Relations
   user              User                    @relation("UserDriver", fields: [userId], references: [id], onDelete: Cascade)
@@ -61,6 +71,7 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  BLOCKED
 
   @@map("approval_status")
 }
@@ -86,6 +97,13 @@ model Order {
   acceptedAt     DateTime?   @map("accepted_at") @db.Timestamptz()
   matchedAt      DateTime?   @map("matched_at") @db.Timestamptz()
   cancelReason   String?     @map("cancel_reason")
+  proofImage     String?     @map("proof_image")
+  deliveredAt    DateTime?   @map("delivered_at") @db.Timestamptz()
+  deliveredLat   Float?      @map("delivered_lat") @db.DoublePrecision
+  deliveredLng   Float?      @map("delivered_lng") @db.DoublePrecision
+  rating         Int?
+  ratingComment  String?     @map("rating_comment")
+  ratingTags     String[]    @map("rating_tags")
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations

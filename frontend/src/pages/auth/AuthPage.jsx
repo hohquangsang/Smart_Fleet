@@ -71,7 +71,7 @@ const AuthPage = () => {
     fullName: '',
     phoneNumber: '',
     role: 'CUSTOMER',
-    vehicleType: '',
+    vehicleType: 'motorcycle',
     licensePlate: '',
   });
 
@@ -392,11 +392,10 @@ const AuthPage = () => {
                         onChange={(e) => updateReg('vehicleType', e.target.value)}
                         required
                       >
-                        <option value="">Chọn loại xe</option>
+                        {/* <option value="">Chọn loại xe</option> */}
                         <option value="motorcycle">Xe máy</option>
-                        <option value="car">Ô tô</option>
-                        <option value="van">Xe tải nhỏ</option>
-                        <option value="truck">Xe tải lớn</option>
+                        <option value="car_4">Ô tô 4 chỗ</option>
+                        <option value="car_7">Ô tô 7 chỗ</option>
                       </select>
                     </div>
                     <div className="auth-field">

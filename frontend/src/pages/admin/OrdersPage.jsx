@@ -86,7 +86,7 @@ const AdminOrdersPage = () => {
       const driverInfo = data.driverInfo || data.driver;
       toast.success(
         `Tài xế ${driverInfo?.name || '?'} (${driverInfo?.licensePlate || ''}) đã nhận đơn ${data.orderId?.slice(-8).toUpperCase()} — ĐANG GIAO`,
-        '✅ Tài xế nhận đơn'
+        'Tài xế nhận đơn'
       );
       // Cập nhật status đơn hàng trong list thành IN_TRANSIT
       setOrders((prev) =>

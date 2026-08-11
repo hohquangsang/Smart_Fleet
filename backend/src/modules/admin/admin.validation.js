@@ -3,8 +3,20 @@ import { z } from 'zod';
 export const approveDriverSchema = z.object({
   action: z.enum(['approve', 'reject']).optional(),
   status: z.enum(['APPROVED', 'REJECTED']).optional(),
+  rejectionReason: z.string().optional(),
+  reason: z.string().optional(),
 }).refine(data => data.action || data.status, {
   message: 'Action or status is required',
+}).refine(data => {
+  const isReject = data.action === 'reject' || data.status === 'REJECTED';
+  const reasonText = data.rejectionReason || data.reason;
+  if (isReject && (!reasonText || !reasonText.trim())) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Vui lòng cung cấp lý do từ chối duyệt tài xế',
+  path: ['rejectionReason'],
 });
 
 export const ordersQuerySchema = z.object({

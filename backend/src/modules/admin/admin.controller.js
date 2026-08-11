@@ -51,16 +51,63 @@ export const getPendingDrivers = catchAsync(async (_req, res) => {
 
 export const approveDriver = catchAsync(async (req, res) => {
   const action = req.body.action || (req.body.status === 'APPROVED' ? 'approve' : 'reject');
-  const driver = await adminService.updateDriverApproval(
+  const rejectionReason = req.body.rejectionReason || req.body.reason || null;
+
+  const result = await adminService.updateDriverApproval(
     req.params.id,
     req.user.id,
-    action
+    action,
+    rejectionReason
   );
 
   res.status(200).json({
     success: true,
-    message: `Driver ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+    message: result.deleted
+      ? 'Hồ sơ bị từ chối lần 2 và tài khoản đã bị xóa khỏi hệ thống'
+      : `Hồ sơ tài xế đã được ${action === 'approve' ? 'phê duyệt' : 'từ chối'} thành công`,
+    data: { driver: result },
+  });
+});
+
+export const blockDriver = catchAsync(async (req, res) => {
+  const { reason } = req.body;
+  const driver = await adminService.blockDriver(req.params.id, reason);
+
+  res.status(200).json({
+    success: true,
+    message: 'Tài xế đã bị khóa tài khoản',
     data: { driver },
+  });
+});
+
+export const unblockDriver = catchAsync(async (req, res) => {
+  const driver = await adminService.unblockDriver(req.params.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã mở khóa tài khoản cho tài xế',
+    data: { driver },
+  });
+});
+
+export const blockUser = catchAsync(async (req, res) => {
+  const { reason } = req.body;
+  const user = await adminService.blockUser(req.params.id, reason);
+
+  res.status(200).json({
+    success: true,
+    message: 'Người dùng khách hàng đã bị khóa tài khoản',
+    data: { user },
+  });
+});
+
+export const unblockUser = catchAsync(async (req, res) => {
+  const user = await adminService.unblockUser(req.params.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã mở khóa tài khoản cho người dùng khách hàng',
+    data: { user },
   });
 });
 

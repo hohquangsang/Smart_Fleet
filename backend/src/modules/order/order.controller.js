@@ -61,6 +61,44 @@ export const startTrip = catchAsync(async (req, res) => {
   });
 });
 
+export const completeTrip = catchAsync(async (req, res) => {
+  const order = await orderService.completeTrip(req.params.id, req.user.id, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Trip completed successfully — status is now ĐÃ GIAO HÀNG',
+    data: { order },
+  });
+});
+
+export const rateOrder = catchAsync(async (req, res) => {
+  const order = await orderService.rateOrder(req.params.id, req.user.id, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Cảm ơn bạn đã đánh giá chuyến xe!',
+    data: { order },
+  });
+});
+
+export const updateOrderStatus = catchAsync(async (req, res) => {
+  const { status } = req.body;
+  let order;
+  if (status === 'IN_TRANSIT') {
+    order = await orderService.startTrip(req.params.id, req.user.id);
+  } else if (status === 'DELIVERED' || status === 'COMPLETED') {
+    order = await orderService.completeTrip(req.params.id, req.user.id, req.body);
+  } else {
+    order = await orderService.getOrderById(req.params.id);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Trạng thái đơn hàng đã chuyển sang ${status}`,
+    data: { order },
+  });
+});
+
 export const getOrders = catchAsync(async (req, res) => {
   const { page, limit, status } = req.query;
 

@@ -17,6 +17,10 @@ router.get('/drivers', adminController.getDrivers);
 router.get('/drivers/pending', adminController.getPendingDrivers);
 router.get('/users', adminController.getUsers);
 router.patch('/drivers/:id/approve', validate(approveDriverSchema), adminController.approveDriver);
+router.patch('/drivers/:id/block', adminController.blockDriver);
+router.patch('/drivers/:id/unblock', adminController.unblockDriver);
+router.patch('/users/:id/block', adminController.blockUser);
+router.patch('/users/:id/unblock', adminController.unblockUser);
 router.get('/analytics', adminController.getAnalytics);
 
 export default router;

@@ -19,3 +19,14 @@ export const updateProfile = catchAsync(async (req, res) => {
     data: { user },
   });
 });
+
+export const submitAppeal = catchAsync(async (req, res) => {
+  const { appealNote } = req.body;
+  const user = await userService.submitUserAppeal(req.user.id, appealNote);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã gửi khiếu nại mở khóa tài khoản tới Admin thành công.',
+    data: { user },
+  });
+});

@@ -26,6 +26,13 @@ router.post('/:id/confirm-match', authorize(ROLES.ADMIN), orderController.confir
 
 // Step 5: Driver starts trip (MATCHED → IN_TRANSIT = ĐANG GIAO)
 router.post('/:id/start-trip', authorize(ROLES.DRIVER), orderController.startTrip);
+router.patch('/:id/status', authorize(ROLES.DRIVER, ROLES.ADMIN), orderController.updateOrderStatus);
+
+// Step 6: Driver completes delivery (IN_TRANSIT → DELIVERED = ĐÃ GIAO HÀNG)
+router.post('/:id/complete-trip', authorize(ROLES.DRIVER), orderController.completeTrip);
+
+// Step 7: Customer rates completed trip
+router.post('/:id/rating', authorize(ROLES.CUSTOMER), orderController.rateOrder);
 
 // Get orders list / details
 router.get('/', authorize(ROLES.CUSTOMER, ROLES.DRIVER, ROLES.ADMIN), orderController.getOrders);

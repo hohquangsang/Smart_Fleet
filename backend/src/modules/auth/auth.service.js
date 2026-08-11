@@ -115,8 +115,15 @@ export const register = async (data) => {
       id: createdDriver.id,
       vehicleType: createdDriver.vehicleType,
       licensePlate: createdDriver.licensePlate,
+      licenseImage: createdDriver.licenseImage || null,
+      cccdImage: createdDriver.cccdImage || null,
       approvalStatus: createdDriver.approvalStatus,
+      rejectionReason: createdDriver.rejectionReason || null,
+      rejectionCount: createdDriver.rejectionCount || 0,
+      appealNote: createdDriver.appealNote || null,
+      isAppealed: Boolean(createdDriver.isAppealed),
       rating: createdDriver.rating || 5.0,
+      isActive: createdDriver.isActive || false,
     };
   }
 
@@ -165,8 +172,15 @@ export const login = async ({ email, password }) => {
       id: user.driver.id,
       vehicleType: user.driver.vehicleType,
       licensePlate: user.driver.licensePlate,
+      licenseImage: user.driver.licenseImage || null,
+      cccdImage: user.driver.cccdImage || null,
       approvalStatus: user.driver.approvalStatus,
-      rating: user.driver.rating,
+      rejectionReason: user.driver.rejectionReason || null,
+      rejectionCount: user.driver.rejectionCount || 0,
+      appealNote: user.driver.appealNote || null,
+      isAppealed: Boolean(user.driver.isAppealed),
+      rating: user.driver.rating || 5.0,
+      isActive: user.driver.isActive || false,
     };
   }
 

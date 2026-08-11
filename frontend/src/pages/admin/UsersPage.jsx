@@ -4,8 +4,12 @@ import api from '../../services/api';
 import useToast from '../../hooks/useToast';
 import '../../styles/admin.css';
 
+import { useContext } from 'react';
+import { SocketContext } from '../../contexts/SocketContext';
+
 const UsersPage = () => {
   const toast = useToast();
+  const socket = useContext(SocketContext);
   const [users, setUsers] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +32,33 @@ const UsersPage = () => {
     };
     fetchUsers();
   }, []);
+
+  // Listen for real-time customer appeal socket event
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserAppealed = (data) => {
+      toast.warning(`📢 Khách hàng ${data.userName} (${data.phoneNumber}) vừa gửi khiếu nại mở khóa tài khoản!`, 'Khiếu Nại Khách Hàng');
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === data.userId
+            ? { ...u, isAppealed: true, appealNote: data.appealNote, blockReason: data.blockReason || u.blockReason }
+            : u
+        )
+      );
+      setSelectedUser((prev) =>
+        prev && prev.id === data.userId
+          ? { ...prev, isAppealed: true, appealNote: data.appealNote, blockReason: data.blockReason || prev.blockReason }
+          : prev
+      );
+    };
+
+    socket.on('admin:user-appealed', handleUserAppealed);
+
+    return () => {
+      socket.off('admin:user-appealed', handleUserAppealed);
+    };
+  }, [socket, toast]);
 
   const filteredUsers = users.filter((u) => {
     if (statusFilter !== 'ALL' && u.status !== statusFilter) return false;
@@ -185,7 +216,23 @@ const UsersPage = () => {
                       {isActive ? (
                         <span className="badge-status badge-status--active">Hoạt động</span>
                       ) : (
-                        <span className="badge-status badge-status--blocked">Bị khóa</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span className="badge-status badge-status--blocked">Bị khóa</span>
+                          {userObj.isAppealed && (
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                color: '#F5A623',
+                                background: 'rgba(245, 166, 35, 0.15)',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                fontWeight: 700,
+                              }}
+                            >
+                              📢 Có khiếu nại mở khóa
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td>{userObj.createdAt}</td>
@@ -244,6 +291,42 @@ const UsersPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Callout lý do bị khóa & khiếu nại */}
+              {selectedUser.status === 'BLOCKED' && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>🔒 Lý do bị khóa:</strong>
+                  <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                    "{selectedUser.blockReason || 'Vi phạm điều khoản hệ thống'}"
+                  </p>
+
+                  {selectedUser.isAppealed && selectedUser.appealNote && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        paddingTop: 6,
+                        borderTop: '1px dashed rgba(245, 166, 35, 0.4)',
+                        color: '#F5A623',
+                      }}
+                    >
+                      <strong style={{ fontSize: '0.85rem' }}>📢 Nội dung khiếu nại mở khóa từ người dùng:</strong>
+                      <p style={{ color: 'var(--text-primary)', fontStyle: 'italic', marginTop: 4, fontSize: '0.9rem' }}>
+                        "{selectedUser.appealNote}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Thông tin liên hệ lưới 2 cột */}
               <div

@@ -33,9 +33,8 @@ const createCustomPuckIcon = (color, label = '') =>
       flex-direction: column;
       align-items: center;
     ">
-      ${
-        label
-          ? `<div style="
+      ${label
+        ? `<div style="
         background: #10141D;
         border: 1px solid ${color};
         color: #FFFFFF;
@@ -47,7 +46,7 @@ const createCustomPuckIcon = (color, label = '') =>
         margin-bottom: 4px;
         white-space: nowrap;
       ">${label}</div>`
-          : ''
+        : ''
       }
       <div style="
         width: 24px;
@@ -80,6 +79,16 @@ const CustomerTrackingPage = () => {
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
   const [cancelNote, setCancelNote] = useState('');
   const [canceling, setCanceling] = useState(false);
+
+  // Rating Modal state
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingStars, setRatingStars] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [submittingRating, setSubmittingRating] = useState(false);
+
+  const QUICK_TAGS = ['Giao đúng giờ ⏱️', 'Thái độ tốt 😊', 'Cẩn thận 📦', 'Đúng tuyến đường 📍'];
+
   const socket = useContext(SocketContext);
 
   // Live GPS vehicle position simulation
@@ -107,6 +116,10 @@ const CustomerTrackingPage = () => {
         setOrder(orderData);
         setOrderStatus(orderData.status);
         if (orderData.driver) setDriverInfo(orderData.driver);
+
+        if (orderData.status === 'DELIVERED' && !orderData.rating) {
+          setShowRatingModal(true);
+        }
 
         const idx = STATUS_MAP[orderData.status];
         if (idx !== undefined && idx >= 0) {
@@ -142,13 +155,17 @@ const CustomerTrackingPage = () => {
         setDriverInfo(data.driver);
       }
 
+      if (data.status === 'DELIVERED') {
+        setShowRatingModal(true);
+      }
+
       // Hiển thị toast thông báo
       const statusMessages = {
         DISPATCHING: '🔍 Hệ thống đang tìm tài xế phù hợp...',
         DRIVER_ACCEPTED: '🤝 Tài xế đã nhận đơn hàng của bạn!',
         MATCHED: '🚗 Tài xế đang trên đường đến lấy hàng!',
         IN_TRANSIT: '🚚 Đơn hàng ĐANG GIAO đến bạn!',
-        DELIVERED: '✅ Đơn hàng đã được giao thành công!',
+        DELIVERED: '✅ Đơn hàng đã được giao thành công! Vui lòng đánh giá chuyến xe.',
         CANCELLED: '❌ Đơn hàng đã bị hủy.',
       };
       if (statusMessages[data.status]) {
@@ -194,8 +211,37 @@ const CustomerTrackingPage = () => {
     }
   };
 
+  const handleRatingSubmit = async (e) => {
+    e.preventDefault();
+    if (!orderId) return;
+
+    setSubmittingRating(true);
+    try {
+      await api.post(`/orders/${orderId}/rating`, {
+        rating: ratingStars,
+        comment: ratingComment,
+        tags: selectedTags,
+      });
+
+      toast.success('Cảm ơn bạn đã đánh giá dịch vụ vận chuyển của SmartFleet!', 'Đánh giá hoàn tất');
+      setShowRatingModal(false);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể gửi đánh giá';
+      toast.error(msg, 'Lỗi');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  const toggleTag = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
   return (
     <div className="customer-container">
+      {/* Existing elements unchanged... */}
       <div className="customer-title-bar">
         <div>
           <h1 className="page-heading">Theo Dõi Đơn Hàng Real-Time</h1>
@@ -282,13 +328,12 @@ const CustomerTrackingPage = () => {
               return (
                 <div key={step.key} className="progress-step">
                   <div
-                    className={`progress-step-dot ${
-                      isCompleted
-                        ? 'progress-step-dot--completed'
-                        : isActive
+                    className={`progress-step-dot ${isCompleted
+                      ? 'progress-step-dot--completed'
+                      : isActive
                         ? 'progress-step-dot--active'
                         : ''
-                    }`}
+                      }`}
                   >
                     {isCompleted ? <HiOutlineCheckCircle /> : idx + 1}
                   </div>
@@ -298,8 +343,8 @@ const CustomerTrackingPage = () => {
                       color: isCompleted
                         ? 'var(--accent-green)'
                         : isActive
-                        ? 'var(--accent-blue)'
-                        : 'var(--text-muted)',
+                          ? 'var(--accent-blue)'
+                          : 'var(--text-muted)',
                       fontWeight: isActive || isCompleted ? 600 : 400,
                     }}
                   >
@@ -310,19 +355,23 @@ const CustomerTrackingPage = () => {
             })}
           </div>
 
-          {/* Card Tài Xế Đang Đón/Giao Hàng */}
+          {/* Card Tài Xế Đang Đón/GIAO HÀNG */}
           <div className="driver-card">
-            <div className="driver-avatar">NN</div>
+            <div className="driver-avatar">
+              {driverInfo?.fullName
+                ? driverInfo.fullName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+                : 'NN'}
+            </div>
             <div className="driver-info">
-              <div className="driver-name">Nguyễn Văn Nam</div>
-              <div className="driver-plate">51K-888.99 • Xe Máy Express</div>
-              <div className="driver-rating">★ 4.9 (128 đánh giá)</div>
+              <div className="driver-name">{driverInfo?.fullName || 'Nguyễn Văn Nam'}</div>
+              <div className="driver-plate">{driverInfo?.licensePlate || '51K-888.99'} • Xe Máy Express</div>
+              <div className="driver-rating">★ {driverInfo?.rating || 4.9} (128 đánh giá)</div>
             </div>
             <div className="driver-actions">
               <button
                 type="button"
                 className="quick-action-btn"
-                onClick={() => toast.info('Đang kết nối cuộc gọi tới tài xế 0908.123.456...', 'Gọi điện')}
+                onClick={() => toast.info(`Đang kết nối cuộc gọi tới tài xế ${driverInfo?.phoneNumber || '0908.123.456'}...`, 'Gọi điện')}
                 title="Gọi điện cho tài xế"
               >
                 <HiOutlinePhone />
@@ -444,6 +493,98 @@ const CustomerTrackingPage = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── BƯỚC 5: AUTO POP-UP ĐÁNH GIÁ CHUYẾN XE KHI ĐÃ GIAO HÀNG ─── */}
+      {showRatingModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ width: 480, textAlign: 'center', padding: '2rem 1.5rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: 8 }}>🎉</div>
+            <h2 className="modal__title" style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent-green)', fontSize: '1.4rem' }}>
+              Đơn Hàng Đã Giao Thành Công!
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '8px 0 1.25rem 0' }}>
+              Vui lòng dành 10 giây để đánh giá trải nghiệm dịch vụ tài xế SmartFleet:
+            </p>
+
+            <form onSubmit={handleRatingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Star Rating Interactive Selector */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, fontSize: '2.2rem', cursor: 'pointer' }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    onClick={() => setRatingStars(star)}
+                    style={{
+                      color: star <= ratingStars ? '#F5A623' : 'var(--border-primary)',
+                      transition: 'transform 0.15s ease, color 0.15s ease',
+                      transform: star <= ratingStars ? 'scale(1.15)' : 'scale(1)',
+                    }}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+
+              {/* Quick Tag Chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                {QUICK_TAGS.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 20,
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        border: isSelected ? '1px solid var(--accent-blue)' : '1px solid var(--border-primary)',
+                        background: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-panel-sub)',
+                        color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Feedback Comment Textarea */}
+              <div className="input-group" style={{ textAlign: 'left' }}>
+                <label className="input-group__label">Nhận xét chi tiết (không bắt buộc):</label>
+                <textarea
+                  className="location-input"
+                  rows={3}
+                  placeholder="Chia sẻ nhận xét của bạn về tài xế..."
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  style={{ flex: 1, padding: '0.85rem', background: 'var(--gradient-blue)' }}
+                  disabled={submittingRating}
+                >
+                  {submittingRating ? 'Đang gửi...' : 'Gửi Đánh Giá ⭐'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowRatingModal(false)}
+                >
+                  Để Sau
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

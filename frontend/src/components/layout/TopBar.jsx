@@ -1,9 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { HiOutlineSearch, HiOutlineBell } from 'react-icons/hi';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/components.css';
 
 const TopBar = ({ title }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const initials = user?.fullName
     ?.split(' ')
@@ -11,6 +13,16 @@ const TopBar = ({ title }) => {
     .join('')
     .toUpperCase()
     .slice(0, 2) || '??';
+
+  const handleProfileClick = () => {
+    if (user?.role === 'DRIVER') {
+      navigate('/driver/profile');
+    } else if (user?.role === 'CUSTOMER') {
+      navigate('/customer/history');
+    } else if (user?.role === 'ADMIN') {
+      navigate('/admin/users');
+    }
+  };
 
   return (
     <header className="topbar">
@@ -31,16 +43,33 @@ const TopBar = ({ title }) => {
           <span className="topbar__notification-badge" />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div
+          onClick={handleProfileClick}
+          title="Chuyển đến trang cập nhật thông tin cá nhân"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            cursor: 'pointer',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            transition: 'background 0.2s ease, border-color 0.2s ease',
+            border: '1px solid transparent',
+            userSelect: 'none',
+          }}
+          className="topbar-user-badge"
+        >
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
               {user?.fullName}
             </div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               {user?.role}
             </div>
           </div>
-          <div className="sidebar__avatar">{initials}</div>
+          <div className="sidebar__avatar" style={{ boxShadow: '0 0 10px rgba(59, 130, 246, 0.3)' }}>
+            {initials}
+          </div>
         </div>
       </div>
     </header>

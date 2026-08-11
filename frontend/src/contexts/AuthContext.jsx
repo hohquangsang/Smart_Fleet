@@ -7,17 +7,40 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load user from localStorage and fetch fresh profile from API on mount
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.clear();
+    const initAuth = async () => {
+      const stored = localStorage.getItem('user');
+      const token = localStorage.getItem('accessToken');
+
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          localStorage.clear();
+        }
       }
-    }
-    setLoading(false);
+
+      if (token) {
+        try {
+          const { data } = await api.get('/users/me');
+          const userData = data?.data?.user || data?.data;
+          if (userData) {
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+          }
+        } catch (err) {
+          if (err.response?.status === 401) {
+            localStorage.clear();
+            setUser(null);
+          }
+        }
+      }
+
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = useCallback(async (email, password) => {
@@ -49,12 +72,24 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((userData) => {
+    setUser((prev) => {
+      const merged = { ...prev, ...userData };
+      if (userData.driver && prev?.driver) {
+        merged.driver = { ...prev.driver, ...userData.driver };
+      }
+      localStorage.setItem('user', JSON.stringify(merged));
+      return merged;
+    });
+  }, []);
+
   const value = {
     user,
     loading,
     login,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'ADMIN',
     isDriver: user?.role === 'DRIVER',

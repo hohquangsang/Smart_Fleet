@@ -12,6 +12,7 @@ const DriversPage = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState(null);
 
   // Rejection / Blocking reason state
   const [showReasonInput, setShowReasonInput] = useState(false);
@@ -28,6 +29,7 @@ const DriversPage = () => {
         if (Array.isArray(driverList)) {
           const mapped = driverList.map((d) => ({
             id: d.id,
+            userId: d.userId,
             name: d.user?.fullName || 'Tài xế SmartFleet',
             phone: d.user?.phoneNumber || '—',
             vehicleType: d.vehicleType || 'Xe máy',
@@ -39,6 +41,12 @@ const DriversPage = () => {
             createdAt: d.user?.createdAt ? new Date(d.user.createdAt).toLocaleDateString('vi-VN') : '—',
             acceptRate: '100%',
             completeRate: '100%',
+            licenseImage: d.licenseImage || null,
+            cccdImage: d.cccdImage || null,
+            rejectionReason: d.rejectionReason || null,
+            rejectionCount: d.rejectionCount || 0,
+            isAppealed: Boolean(d.isAppealed),
+            appealNote: d.appealNote || null,
           }));
           setDrivers(mapped);
         }
@@ -49,7 +57,7 @@ const DriversPage = () => {
     fetchDrivers();
   }, []);
 
-  // Listen to admin:new-driver-registered real-time socket event
+  // Listen to admin:new-driver-registered & admin:driver-appealed real-time socket events
   useEffect(() => {
     if (!socket) return;
 
@@ -72,15 +80,73 @@ const DriversPage = () => {
         createdAt: new Date(d.createdAt || Date.now()).toLocaleDateString('vi-VN'),
         acceptRate: '100%',
         completeRate: '100%',
+        licenseImage: null,
+        cccdImage: null,
+        rejectionReason: null,
+        rejectionCount: 0,
+        isAppealed: false,
+        appealNote: null,
       };
 
       setDrivers((prev) => [newDriverObj, ...prev.filter((item) => item.id !== d.id)]);
     };
 
+    const handleDriverAppealed = (d) => {
+      console.log('📢 [Admin] admin:driver-appealed received:', d);
+      toast.info(
+        `Tài xế ${d.driverName || ''} vừa gửi khiếu nại/giải trình: "${d.appealNote || ''}"`,
+        '📢 Khiếu Nại Mới'
+      );
+
+      setDrivers((prev) => {
+        const exists = prev.some((item) => item.id === d.driverId);
+        if (exists) {
+          return prev.map((item) => {
+            if (item.id === d.driverId) {
+              return {
+                ...item,
+                approvalStatus: 'PENDING',
+                isAppealed: true,
+                appealNote: d.appealNote,
+                rejectionReason: d.rejectionReason || item.rejectionReason,
+                rejectionCount: d.rejectionCount || item.rejectionCount,
+                licenseImage: d.licenseImage || item.licenseImage,
+                cccdImage: d.cccdImage || item.cccdImage,
+                vehicleType: d.vehicleType || item.vehicleType,
+                licensePlate: d.licensePlate || item.licensePlate,
+                name: d.driverName || item.name,
+                phone: d.phoneNumber || item.phone,
+              };
+            }
+            return item;
+          });
+        }
+        return prev;
+      });
+
+      setSelectedDriver((prev) => {
+        if (prev && prev.id === d.driverId) {
+          return {
+            ...prev,
+            approvalStatus: 'PENDING',
+            isAppealed: true,
+            appealNote: d.appealNote,
+            rejectionReason: d.rejectionReason || prev.rejectionReason,
+            rejectionCount: d.rejectionCount || prev.rejectionCount,
+            licenseImage: d.licenseImage || prev.licenseImage,
+            cccdImage: d.cccdImage || prev.cccdImage,
+          };
+        }
+        return prev;
+      });
+    };
+
     socket.on('admin:new-driver-registered', handleNewDriver);
+    socket.on('admin:driver-appealed', handleDriverAppealed);
 
     return () => {
       socket.off('admin:new-driver-registered', handleNewDriver);
+      socket.off('admin:driver-appealed', handleDriverAppealed);
     };
   }, [socket, toast]);
 
@@ -125,15 +191,29 @@ const DriversPage = () => {
 
     try {
       if (isRejecting) {
-        await api.patch(`/admin/drivers/${driver.id}/approve`, { status: 'REJECTED', reason: actionReason });
+        const { data } = await api.patch(`/admin/drivers/${driver.id}/approve`, {
+          action: 'reject',
+          status: 'REJECTED',
+          rejectionReason: actionReason.trim(),
+          reason: actionReason.trim(),
+        });
+
+        const isDeleted = data?.data?.driver?.deleted;
+        if (isDeleted) {
+          toast.error(`Tài xế ${driver.name} đã bị từ chối lần 2 và tài khoản đã được xóa khỏi hệ thống!`, 'Xóa tài khoản vĩnh viễn');
+          setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+          setSelectedDriver(null);
+          setShowReasonInput(false);
+          setActionReason('');
+          setProcessing(false);
+          return;
+        }
       } else {
-        await api.patch(`/admin/drivers/${driver.id}/block`, { reason: actionReason });
+        await api.patch(`/admin/drivers/${driver.id}/block`, { reason: actionReason.trim() });
       }
-    } catch {
-      // ignore API error in mock mode
-    } finally {
+
       toast.error(
-        `Đã ${isRejecting ? 'từ chối hồ sơ' : 'khóa tài khoản'} tài xế ${driver.name}. Lý do: ${actionReason}`,
+        `Đã ${isRejecting ? 'từ chối hồ sơ' : 'khóa tài khoản'} tài xế ${driver.name}. Lý do: ${actionReason.trim()}`,
         isRejecting ? 'Từ chối hồ sơ' : 'Khóa tài khoản'
       );
 
@@ -141,6 +221,10 @@ const DriversPage = () => {
         prev.map((d) => (d.id === driver.id ? { ...d, approvalStatus: newStatus } : d))
       );
       setSelectedDriver((prev) => (prev ? { ...prev, approvalStatus: newStatus } : null));
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể thực hiện thao tác từ chối tài xế';
+      toast.error(msg, 'Lỗi thao tác Admin');
+    } finally {
       setShowReasonInput(false);
       setActionReason('');
       setProcessing(false);
@@ -269,7 +353,16 @@ const DriversPage = () => {
                       </div>
                     </td>
                     <td>
-                      {isPending && <span className="badge-status badge-status--pending">Chờ duyệt</span>}
+                      {isPending && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span className="badge-status badge-status--pending">Chờ duyệt</span>
+                          {driver.isAppealed && (
+                            <span style={{ fontSize: '0.7rem', color: '#F5A623', fontWeight: 700 }}>
+                              📢 Đã gửi khiếu nại
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {isApproved && <span className="badge-status badge-status--approved">Đã duyệt</span>}
                       {isBlocked && <span className="badge-status badge-status--blocked">Bị khóa</span>}
                     </td>
@@ -341,7 +434,7 @@ const DriversPage = () => {
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 2 }}>
                     SĐT: {selectedDriver.phone}
                   </div>
-                  <div style={{ marginTop: 6 }}>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
                     {selectedDriver.approvalStatus === 'PENDING' && (
                       <span className="badge-status badge-status--pending">Chờ duyệt</span>
                     )}
@@ -351,9 +444,52 @@ const DriversPage = () => {
                     {selectedDriver.approvalStatus === 'BLOCKED' && (
                       <span className="badge-status badge-status--blocked">Bị khóa</span>
                     )}
+                    {selectedDriver.isAppealed && (
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(245,166,35,0.2)', color: '#F5A623', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                        📢 Khiếu nại
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* KHỐI NỘI DUNG KHIẾU NẠI / GIẢI TRÌNH TỪ DRIVER */}
+              {(selectedDriver.isAppealed || selectedDriver.appealNote) && (
+                <div
+                  style={{
+                    background: 'rgba(245, 166, 35, 0.12)',
+                    border: '1px solid rgba(245, 166, 35, 0.4)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: '#F5A623', fontSize: '0.85rem' }}>
+                    📢 NỘI DUNG KHIẾU NẠI / GIẢI TRÌNH TỪ TÀI XẾ:
+                  </div>
+                  <div style={{ color: 'var(--text-primary)', marginTop: 4, fontStyle: 'italic', fontSize: '0.9rem' }}>
+                    "{selectedDriver.appealNote || 'Tài xế đã cập nhật thông tin và đề nghị xem xét lại.'}"
+                  </div>
+                </div>
+              )}
+
+              {/* KHỐI LÝ DO TỪ CHỐI LẦN TRƯỚC */}
+              {selectedDriver.rejectionReason && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: 'var(--accent-red)', fontSize: '0.8rem' }}>
+                    ❌ LÝ DO TỪ CHỐI LẦN TRƯỚC (Lần {selectedDriver.rejectionCount || 1}):
+                  </div>
+                  <div style={{ color: 'var(--accent-red)', marginTop: 2, fontSize: '0.85rem' }}>
+                    {selectedDriver.rejectionReason}
+                  </div>
+                </div>
+              )}
 
               {/* Khối Thông tin phương tiện & Ngày tham gia */}
               <div
@@ -415,23 +551,84 @@ const DriversPage = () => {
                 </div>
               </div>
 
-              {/* Khối Giấy tờ xác minh (3 ô vuông viền nét đứt) */}
+              {/* Khối Giấy tờ xác minh (Hình ảnh thực tế từ Driver) */}
               <div>
                 <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
                   Giấy Tờ Xác Minh Đã Tải Lên
                 </h4>
-                <div className="docs-grid">
-                  <div className="doc-dashed-box" onClick={() => toast.info('Xem ảnh Căn cước công dân', 'Hồ sơ')}>
-                    <HiOutlineDocumentText className="doc-icon" />
-                    <span className="doc-title">Ảnh CCCD</span>
+                <div className="docs-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div
+                    className="doc-dashed-box"
+                    style={{
+                      height: 120,
+                      padding: 6,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      cursor: selectedDriver.cccdImage ? 'pointer' : 'default',
+                      borderStyle: selectedDriver.cccdImage ? 'solid' : 'dashed',
+                      borderColor: selectedDriver.cccdImage ? 'var(--accent-blue)' : 'var(--border-primary)',
+                    }}
+                    onClick={() => {
+                      if (selectedDriver.cccdImage) {
+                        setPreviewImageModal({ title: `Ảnh CCCD - ${selectedDriver.name}`, src: selectedDriver.cccdImage });
+                      } else {
+                        toast.warning('Tài xế chưa tải lên ảnh CCCD');
+                      }
+                    }}
+                  >
+                    {selectedDriver.cccdImage ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                        <img src={selectedDriver.cccdImage} alt="CCCD" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+                        <span style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: 4 }}>
+                          🔍 Phóng to
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <HiOutlineDocumentText className="doc-icon" />
+                        <span className="doc-title">Chưa có ảnh CCCD</span>
+                      </>
+                    )}
                   </div>
-                  <div className="doc-dashed-box" onClick={() => toast.info('Xem ảnh Giấy phép lái xe', 'Hồ sơ')}>
-                    <HiOutlineDocumentText className="doc-icon" />
-                    <span className="doc-title">Bằng Lái Xe</span>
-                  </div>
-                  <div className="doc-dashed-box" onClick={() => toast.info('Xem ảnh Cà vẹt Đăng ký xe', 'Hồ sơ')}>
-                    <HiOutlineDocumentText className="doc-icon" />
-                    <span className="doc-title">Đăng Ký Xe</span>
+
+                  <div
+                    className="doc-dashed-box"
+                    style={{
+                      height: 120,
+                      padding: 6,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      cursor: selectedDriver.licenseImage ? 'pointer' : 'default',
+                      borderStyle: selectedDriver.licenseImage ? 'solid' : 'dashed',
+                      borderColor: selectedDriver.licenseImage ? 'var(--accent-blue)' : 'var(--border-primary)',
+                    }}
+                    onClick={() => {
+                      if (selectedDriver.licenseImage) {
+                        setPreviewImageModal({ title: `Ảnh GPLX - ${selectedDriver.name}`, src: selectedDriver.licenseImage });
+                      } else {
+                        toast.warning('Tài xế chưa tải lên ảnh Bằng Lái Xe');
+                      }
+                    }}
+                  >
+                    {selectedDriver.licenseImage ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                        <img src={selectedDriver.licenseImage} alt="GPLX" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+                        <span style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: 4 }}>
+                          🔍 Phóng to
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <HiOutlineDocumentText className="doc-icon" />
+                        <span className="doc-title">Chưa có Bằng Lái Xe</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -567,6 +764,36 @@ const DriversPage = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* ─── MODAL PHÓNG TO HÌNH ẢNH GIẤY TỜ ───────────────── */}
+      {previewImageModal && (
+        <div className="modal-overlay" onClick={() => setPreviewImageModal(null)} style={{ zIndex: 9999 }}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 700, width: '90vw', padding: '1.5rem' }}
+          >
+            <div className="modal__header">
+              <h2 className="modal__title">{previewImageModal.title}</h2>
+              <button className="toast-card__close" onClick={() => setPreviewImageModal(null)}>
+                &times;
+              </button>
+            </div>
+            <div style={{ margin: '1rem 0', textAlign: 'center' }}>
+              <img
+                src={previewImageModal.src}
+                alt={previewImageModal.title}
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 10, objectFit: 'contain' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn--secondary" onClick={() => setPreviewImageModal(null)}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

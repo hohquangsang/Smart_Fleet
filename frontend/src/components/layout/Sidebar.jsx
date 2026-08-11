@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout } from 'react-icons/hi';
+import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout, HiOutlineUser } from 'react-icons/hi';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/sidebar.css';
 
@@ -24,13 +24,15 @@ const customerNavItems = [
   { path: '/customer', label: 'Đặt đơn & Tính cước', icon: <HiOutlineShoppingCart /> },
   { path: '/customer/tracking', label: 'Theo dõi Real-time', icon: <HiOutlineMap /> },
   { path: '/customer/history', label: 'Lịch sử & Hóa đơn', icon: <HiOutlineDocumentText /> },
+  { path: '/customer/profile', label: 'Thông tin cá nhân', icon: <HiOutlineUser /> },
 ];
 
 const driverNavItems = [
   { path: '/driver', label: 'Tổng quan & Trạng thái', icon: <HiOutlineViewGrid /> },
   { path: '/driver/dispatch', label: 'Nhận đơn Real-time', icon: <HiOutlineTruck /> },
-  { path: '/driver/active', label: 'Đang ', icon: <HiOutlineMap /> },
+  { path: '/driver/active', label: 'Chuyến xe hiện tại', icon: <HiOutlineMap /> },
   { path: '/driver/earnings', label: 'Thu nhập & Hiệu suất', icon: <HiOutlineChartBar /> },
+  { path: '/driver/profile', label: 'Thông tin cá nhân', icon: <HiOutlineUser /> },
 ];
 
 const Sidebar = () => {
@@ -111,13 +113,26 @@ const Sidebar = () => {
       </nav>
 
       <div className="sidebar__footer">
-        <div className="sidebar__user" onClick={logout} title="Logout">
-          <div className="sidebar__avatar">{initials}</div>
-          <div className="sidebar__user-info">
-            <div className="sidebar__user-name">{user?.fullName}</div>
-            <div className="sidebar__user-role">{user?.role}</div>
-          </div>
-          <HiOutlineLogout style={{ marginLeft: 'auto', fontSize: '1.1rem', color: 'var(--text-muted)' }} />
+        <div className="sidebar__user" style={{ cursor: 'default' }}>
+          <NavLink
+            to={isDriver ? '/driver/profile' : isAdmin ? '/admin/users' : '/customer/profile'}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', color: 'inherit' }}
+            title="Cập nhật thông tin cá nhân"
+          >
+            <div className="sidebar__avatar">{initials}</div>
+            <div className="sidebar__user-info">
+              <div className="sidebar__user-name">{user?.fullName}</div>
+              <div className="sidebar__user-role">{user?.role}</div>
+            </div>
+          </NavLink>
+          <button
+            type="button"
+            onClick={logout}
+            title="Đăng xuất"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
+          >
+            <HiOutlineLogout style={{ fontSize: '1.2rem', color: 'var(--accent-red)' }} />
+          </button>
         </div>
       </div>
     </aside>

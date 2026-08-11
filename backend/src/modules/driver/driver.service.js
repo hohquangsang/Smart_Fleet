@@ -35,6 +35,16 @@ export const getDriverProfile = async (userId) => {
   };
 };
 
+import { updateProfile } from '../user/user.service.js';
+
+/**
+ * Update driver profile and associated user info.
+ */
+export const updateDriverProfile = async (userId, data) => {
+  await updateProfile(userId, data);
+  return getDriverProfile(userId);
+};
+
 import { registerOnlineDriver, unregisterOnlineDriver } from '../order/dispatch.service.js';
 
 /**
@@ -299,4 +309,80 @@ export const getDriverEarnings = async (userId, { period = 'week' } = {}) => {
     bars,
     history,
   };
+};
+
+/**
+ * Driver updates profile & submits appeal to Admin after being rejected.
+ */
+export const submitDriverAppeal = async (userId, data) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId },
+    include: { user: true },
+  });
+
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const { appealNote, fullName, phoneNumber, vehicleType, licensePlate, licenseImage, cccdImage } = data;
+
+  // Update user info if provided
+  if (fullName || phoneNumber) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(fullName && { fullName: fullName.trim() }),
+        ...(phoneNumber && { phoneNumber: phoneNumber.trim() }),
+      },
+    });
+  }
+
+  // Preserve APPROVED status if driver is already approved, otherwise set to PENDING
+  const nextApprovalStatus = driver.approvalStatus === APPROVAL_STATUS.APPROVED
+    ? APPROVAL_STATUS.APPROVED
+    : APPROVAL_STATUS.PENDING;
+
+  // Update driver details, set isAppealed to true
+  const updatedDriver = await prisma.driver.update({
+    where: { id: driver.id },
+    data: {
+      ...(vehicleType && { vehicleType: vehicleType.trim() }),
+      ...(licensePlate && { licensePlate: licensePlate.trim() }),
+      ...(licenseImage && { licenseImage }),
+      ...(cccdImage && { cccdImage }),
+      approvalStatus: nextApprovalStatus,
+      isAppealed: true,
+      appealNote: appealNote ? appealNote.trim() : 'Tài xế đã bổ sung thông tin và gửi yêu cầu đến Admin.',
+    },
+    include: {
+      user: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
+    },
+  });
+
+  // Emit real-time socket event to Admin namespace
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    if (io) {
+      io.of('/admin').to('admin:notifications').emit('admin:driver-appealed', {
+        driverId: updatedDriver.id,
+        driverName: updatedDriver.user?.fullName,
+        phoneNumber: updatedDriver.user?.phoneNumber,
+        vehicleType: updatedDriver.vehicleType,
+        licensePlate: updatedDriver.licensePlate,
+        licenseImage: updatedDriver.licenseImage,
+        cccdImage: updatedDriver.cccdImage,
+        approvalStatus: updatedDriver.approvalStatus,
+        isAppealed: updatedDriver.isAppealed,
+        appealNote: updatedDriver.appealNote,
+        rejectionReason: updatedDriver.rejectionReason,
+        rejectionCount: updatedDriver.rejectionCount,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('Socket emit error on submitDriverAppeal:', err);
+  }
+
+  return updatedDriver;
 };
