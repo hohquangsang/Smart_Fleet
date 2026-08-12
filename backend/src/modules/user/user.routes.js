@@ -11,5 +11,6 @@ router.use(auth);
 router.get('/me', userController.getProfile);
 router.patch('/me', validate(updateProfileSchema), userController.updateProfile);
 router.post('/me/appeal', userController.submitAppeal);
+router.post('/register-driver', userController.registerDriver);
 
 export default router;

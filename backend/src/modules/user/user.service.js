@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../../config/database.js';
-import { NotFoundError, ConflictError } from '../../utils/api-error.js';
+import { NotFoundError, ConflictError, BadRequestError } from '../../utils/api-error.js';
 
 /**
  * Get user profile by ID, including driver info if applicable.
@@ -14,6 +14,8 @@ export const getProfile = async (userId) => {
       role: true,
       fullName: true,
       phoneNumber: true,
+      avatar: true,
+      cccdImage: true,
       isBlocked: true,
       blockReason: true,
       appealNote: true,
@@ -86,7 +88,7 @@ export const submitUserAppeal = async (userId, appealNote) => {
  * Update user profile & driver details.
  */
 export const updateProfile = async (userId, data) => {
-  const { email, phoneNumber, fullName, password, vehicleType, licensePlate, licenseImage, cccdImage } = data;
+  const { email, phoneNumber, fullName, password, avatar, cccdImage, vehicleType, licensePlate, licenseImage } = data;
 
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
@@ -125,6 +127,8 @@ export const updateProfile = async (userId, data) => {
   if (fullName !== undefined) updateUserData.fullName = fullName;
   if (phoneNumber !== undefined) updateUserData.phoneNumber = phoneNumber;
   if (email !== undefined) updateUserData.email = email;
+  if (avatar !== undefined) updateUserData.avatar = avatar;
+  if (cccdImage !== undefined) updateUserData.cccdImage = cccdImage;
   if (password) {
     updateUserData.passwordHash = await bcrypt.hash(password, 12);
   }
@@ -134,8 +138,8 @@ export const updateProfile = async (userId, data) => {
     data: updateUserData,
   });
 
-  // Update driver details if user is DRIVER
-  if (currentUser.role === 'DRIVER') {
+  // Update driver details if user is DRIVER or has driver profile
+  if (currentUser.driver || currentUser.role === 'DRIVER') {
     const updateDriverData = {};
     if (vehicleType !== undefined) updateDriverData.vehicleType = vehicleType;
     if (licensePlate !== undefined) updateDriverData.licensePlate = licensePlate;
@@ -159,6 +163,95 @@ export const updateProfile = async (userId, data) => {
         });
       }
     }
+  }
+
+  return getProfile(userId);
+};
+
+/**
+ * Register to become a Driver (Customer submitting driver application).
+ */
+export const registerDriver = async (userId, data) => {
+  const { vehicleType, licensePlate, licenseImage, cccdImage } = data;
+
+  if (!vehicleType || !licensePlate) {
+    throw new BadRequestError('Vui lòng nhập đầy đủ loại phương tiện và biển số xe');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { driver: true },
+  });
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  if (user.driver && user.driver.approvalStatus === 'APPROVED') {
+    throw new BadRequestError('Tài khoản của bạn đã là tài xế đã được phê duyệt');
+  }
+
+  const cleanPlate = licensePlate.trim().toUpperCase();
+  const existingPlate = await prisma.driver.findUnique({
+    where: { licensePlate: cleanPlate },
+  });
+
+  if (existingPlate && existingPlate.userId !== userId) {
+    throw new ConflictError('Biển số xe này đã được đăng ký bởi một tài xế khác');
+  }
+
+  let driver;
+  if (user.driver) {
+    driver = await prisma.driver.update({
+      where: { userId },
+      data: {
+        vehicleType: vehicleType.trim(),
+        licensePlate: cleanPlate,
+        licenseImage: licenseImage || user.driver.licenseImage || null,
+        cccdImage: cccdImage || user.driver.cccdImage || user.cccdImage || null,
+        approvalStatus: 'PENDING',
+        rejectionReason: null,
+        isAppealed: false,
+        appealNote: null,
+      },
+    });
+  } else {
+    driver = await prisma.driver.create({
+      data: {
+        userId,
+        vehicleType: vehicleType.trim(),
+        licensePlate: cleanPlate,
+        licenseImage: licenseImage || null,
+        cccdImage: cccdImage || user.cccdImage || null,
+        approvalStatus: 'PENDING',
+      },
+    });
+  }
+
+  if (cccdImage) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { cccdImage },
+    });
+  }
+
+  // Emit Socket.IO notification to Admin namespace
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    if (io) {
+      io.of('/admin').emit('admin:new-driver-registered', {
+        driverId: driver.id,
+        userId: user.id,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        vehicleType: driver.vehicleType,
+        licensePlate: driver.licensePlate,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('Failed to emit socket event on driver registration:', err);
   }
 
   return getProfile(userId);

@@ -5,6 +5,7 @@ export const updateProfileSchema = z.object({
   phoneNumber: z.string().min(9).max(20).optional(),
   email: z.string().email().optional(),
   password: z.string().min(6).max(100).optional(),
+  avatar: z.string().nullable().optional(),
   vehicleType: z.string().optional(),
   licensePlate: z.string().optional(),
   licenseImage: z.string().nullable().optional(),

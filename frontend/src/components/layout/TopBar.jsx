@@ -18,9 +18,9 @@ const TopBar = ({ title }) => {
     if (user?.role === 'DRIVER') {
       navigate('/driver/profile');
     } else if (user?.role === 'CUSTOMER') {
-      navigate('/customer/history');
+      navigate('/customer/profile');
     } else if (user?.role === 'ADMIN') {
-      navigate('/admin/users');
+      navigate('/admin/dashboard');
     }
   };
 

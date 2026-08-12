@@ -30,3 +30,13 @@ export const submitAppeal = catchAsync(async (req, res) => {
     data: { user },
   });
 });
+
+export const registerDriver = catchAsync(async (req, res) => {
+  const user = await userService.registerDriver(req.user.id, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Nộp hồ sơ đăng ký tài xế thành công! Vui lòng chờ Admin phê duyệt.',
+    data: { user },
+  });
+});
