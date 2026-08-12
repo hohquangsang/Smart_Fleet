@@ -108,6 +108,10 @@ export const register = async (data) => {
     role: user.role,
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
+    isBlocked: Boolean(user.isBlocked),
+    blockReason: user.blockReason || null,
+    appealNote: user.appealNote || null,
+    isAppealed: Boolean(user.isAppealed),
   };
 
   if (createdDriver) {
@@ -162,6 +166,10 @@ export const login = async ({ email, password }) => {
       role: user.role,
       fullName: user.fullName,
       phoneNumber: user.phoneNumber,
+      isBlocked: Boolean(user.isBlocked),
+      blockReason: user.blockReason || null,
+      appealNote: user.appealNote || null,
+      isAppealed: Boolean(user.isAppealed),
     },
     ...tokens,
   };

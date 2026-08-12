@@ -1,7 +1,3 @@
-/**
- * Setup customer namespace socket handlers.
- * Handles: track-order (join room for real-time location updates)
- */
 export const setupCustomerSocket = (customerNamespace) => {
   customerNamespace.on('connection', (socket) => {
     const { id: userId, role } = socket.user;

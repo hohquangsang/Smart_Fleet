@@ -1,8 +1,6 @@
 import catchAsync from '../../utils/catch-async.js';
 
-/**
- * Autocomplete address suggestions using Nominatim.
- */
+
 export const autocompleteAddress = catchAsync(async (req, res) => {
   const { q } = req.query;
   if (!q || typeof q !== 'string' || q.trim().length < 2) {
@@ -35,9 +33,7 @@ export const autocompleteAddress = catchAsync(async (req, res) => {
   }
 });
 
-/**
- * Reverse geocode coordinates to street address.
- */
+
 export const reverseGeocode = catchAsync(async (req, res) => {
   const { lat, lng } = req.query;
   if (!lat || !lng) {

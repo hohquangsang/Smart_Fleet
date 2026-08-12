@@ -2,14 +2,10 @@ import redis from '../config/redis.js';
 import env from '../config/env.js';
 import * as orsService from './ors.service.js';
 
-/**
- * Round coordinate to 4 decimal places (~11m precision) for better cache hit rate.
- */
+
 const roundCoord = (val) => Math.round(val * 10000) / 10000;
 
-/**
- * Generate cache key from pickup/dropoff coordinates.
- */
+
 const getCacheKey = (pickupLat, pickupLng, dropoffLat, dropoffLng) => {
   const p1 = `${roundCoord(pickupLat)},${roundCoord(pickupLng)}`;
   const p2 = `${roundCoord(dropoffLat)},${roundCoord(dropoffLng)}`;
@@ -49,9 +45,9 @@ export const getRouteWithCache = async (pickupLat, pickupLng, dropoffLat, dropof
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((pickupLat * Math.PI) / 180) *
-        Math.cos((dropoffLat * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((dropoffLat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const dist = Math.max(1, Math.ceil(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))));
     const fallbackRoute = { distanceKm: dist, durationMin: dist * 3 };
     return { ...fallbackRoute, cached: false };

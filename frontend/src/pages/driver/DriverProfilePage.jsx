@@ -210,10 +210,10 @@ const DriverProfilePage = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span
             className={`approval-badge ${approvalStatus === 'APPROVED'
-                ? 'approval-badge--approved'
-                : approvalStatus === 'REJECTED'
-                  ? 'approval-badge--rejected'
-                  : 'approval-badge--pending'
+              ? 'approval-badge--approved'
+              : approvalStatus === 'REJECTED'
+                ? 'approval-badge--rejected'
+                : 'approval-badge--pending'
               }`}
             style={{
               ...(approvalStatus === 'REJECTED' && {

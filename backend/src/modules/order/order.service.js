@@ -26,6 +26,12 @@ import {
  * Emits order:status-update to customer and admin:new-order-request to Admin.
  */
 export const createOrder = async (customerId, data) => {
+  // 0. Check if customer is blocked
+  const customer = await prisma.user.findUnique({ where: { id: customerId } });
+  if (customer && customer.isBlocked) {
+    throw new ForbiddenError('Tài khoản của bạn đã bị khóa bởi Admin. Vui lòng gửi khiếu nại mở lại tài khoản.');
+  }
+
   const { pickupAddress, pickupLat, pickupLng, dropoffAddress, dropoffLat, dropoffLng, vehicleType = 'motorcycle' } = data;
 
   // 1. Get route info (with caching)
@@ -148,6 +154,10 @@ export const acceptOrder = async (orderId, driverUserId) => {
 
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
+  }
+
+  if (driver.approvalStatus !== 'APPROVED') {
+    throw new ForbiddenError('Tài khoản tài xế của bạn đang bị khóa hoặc chưa được Admin phê duyệt.');
   }
 
   const lockKey = REDIS_KEYS.ORDER_LOCK(orderId);

@@ -20,10 +20,6 @@ export const unregisterOnlineDriver = async (driverId, vehicleType = 'motorcycle
   await redis.srem(key, driverId);
 };
 
-/**
- * Get all online driver IDs for a specific vehicle type.
- * Combines Redis online set and DB active drivers to guarantee no driver is missed.
- */
 export const getOnlineDriverIds = async (vehicleType = 'motorcycle') => {
   const key = REDIS_KEYS.DRIVERS_ONLINE_VEHICLE(vehicleType);
   const redisDriverIds = await redis.smembers(key);

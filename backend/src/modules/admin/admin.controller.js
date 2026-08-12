@@ -2,11 +2,11 @@ import * as adminService from './admin.service.js';
 import catchAsync from '../../utils/catch-async.js';
 
 export const getDashboard = catchAsync(async (_req, res) => {
-  const stats = await adminService.getDashboardStats();
+  const dashboardData = await adminService.getDashboardStats();
 
   res.status(200).json({
     success: true,
-    data: { stats },
+    data: dashboardData,
   });
 });
 
@@ -86,6 +86,16 @@ export const unblockDriver = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Đã mở khóa tài khoản cho tài xế',
+    data: { driver },
+  });
+});
+
+export const resolveDriverAppeal = catchAsync(async (req, res) => {
+  const driver = await adminService.resolveDriverAppeal(req.params.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã xác nhận xử lý khiếu nại của tài xế',
     data: { driver },
   });
 });

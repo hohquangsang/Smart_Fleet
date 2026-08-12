@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { HiOutlineUser, HiOutlineMail, HiOutlinePhone, HiOutlineLockClosed, HiOutlineExclamationCircle, HiOutlineSave } from 'react-icons/hi';
 import useAuth from '../../hooks/useAuth';
 import useToast from '../../hooks/useToast';
+import { SocketContext } from '../../contexts/SocketContext';
 import api from '../../services/api';
 
 const CustomerProfilePage = () => {
   const { user, updateUser } = useAuth();
   const toast = useToast();
+  const socket = useContext(SocketContext);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -24,6 +26,28 @@ const CustomerProfilePage = () => {
   const [isAppealed, setIsAppealed] = useState(Boolean(user?.isAppealed));
   const [appealNote, setAppealNote] = useState(user?.appealNote || '');
   const [submittingAppeal, setSubmittingAppeal] = useState(false);
+
+  // Listen to socket: user:status-updated
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserStatusUpdate = (data) => {
+      if (data.isBlocked !== undefined) {
+        setIsBlocked(Boolean(data.isBlocked));
+        if (data.blockReason) setBlockReason(data.blockReason);
+        if (data.isBlocked) {
+          toast.error(`Tài khoản của bạn đã bị khóa bởi Admin: "${data.blockReason || ''}"`, 'Tài khoản bị khóa');
+        } else {
+          setIsAppealed(false);
+          setAppealNote('');
+          toast.success('Tài khoản của bạn đã được Admin mở khóa thành công!', 'Chúc mừng 🎉');
+        }
+      }
+    };
+
+    socket.on('user:status-updated', handleUserStatusUpdate);
+    return () => socket.off('user:status-updated', handleUserStatusUpdate);
+  }, [socket, toast]);
 
   // Fetch latest profile on mount
   useEffect(() => {

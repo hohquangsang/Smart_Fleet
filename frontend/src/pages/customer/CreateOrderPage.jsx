@@ -50,7 +50,7 @@ const MapRecenter = ({ pickupCoords, dropoffCoords }) => {
 const VEHICLES = [
   {
     id: 'motorcycle',
-    name: 'Xe Máy Express',
+    name: 'Xe Máy',
     ratePerKm: 10000,
     desc: 'Thích hợp cho hàng gọn nhẹ, giao cực nhanh',
     icon: '🛵',
@@ -433,7 +433,7 @@ const CreateOrderPage = () => {
             </div>
           </div>
 
-          {/* CHỌN LỌẠI PHƯƠNG TIỆN (3 LOẠI VỚI ĐƠN GIÁ BẮT BUỘC) */}
+          {/* CHỌN LOẠI PHƯƠNG TIỆN (3 LOẠI VỚI ĐƠN GIÁ BẮT BUỘC) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label className="input-group__label">Chọn Loại Phương Tiện Vận Chuyển</label>
             <div className="vehicle-cards-grid">
@@ -447,20 +447,22 @@ const CreateOrderPage = () => {
                     className={`vehicle-card ${isSelected ? 'vehicle-card--selected' : ''}`}
                     onClick={() => setSelectedVehicle(v.id)}
                   >
-                    <div className="vehicle-card__header">
-                      <span style={{ fontSize: '1.75rem' }}>{v.icon}</span>
-                      <span className="vehicle-card__price">
-                        {v.ratePerKm.toLocaleString('vi-VN')} đ/km
-                      </span>
-                    </div>
-                    <div className="vehicle-card__name">{v.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{v.desc}</div>
+                    <div className="vehicle-card__icon">{v.icon}</div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border-primary)' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}></span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                    <div className="vehicle-card__info">
+                      <div className="vehicle-card__title-row">
+                        <span className="vehicle-card__name">{v.name}</span>
+                        <span className="vehicle-card__rate">
+                          {v.ratePerKm.toLocaleString('vi-VN')} đ/km
+                        </span>
+                      </div>
+                      <div className="vehicle-card__desc">{v.desc}</div>
+                    </div>
+
+                    <div className="vehicle-card__fare-col">
+                      <div className="vehicle-card__fare-amount">
                         ~{fareForThisVeh.toLocaleString('vi-VN')} đ
-                      </span>
+                      </div>
                     </div>
                   </div>
                 );

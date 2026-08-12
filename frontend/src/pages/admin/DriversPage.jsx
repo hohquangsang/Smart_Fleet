@@ -105,7 +105,7 @@ const DriversPage = () => {
             if (item.id === d.driverId) {
               return {
                 ...item,
-                approvalStatus: 'PENDING',
+                approvalStatus: d.approvalStatus || item.approvalStatus,
                 isAppealed: true,
                 appealNote: d.appealNote,
                 rejectionReason: d.rejectionReason || item.rejectionReason,
@@ -128,7 +128,7 @@ const DriversPage = () => {
         if (prev && prev.id === d.driverId) {
           return {
             ...prev,
-            approvalStatus: 'PENDING',
+            approvalStatus: d.approvalStatus || prev.approvalStatus,
             isAppealed: true,
             appealNote: d.appealNote,
             rejectionReason: d.rejectionReason || prev.rejectionReason,
@@ -152,7 +152,11 @@ const DriversPage = () => {
 
   // Filtered drivers list
   const filteredDrivers = drivers.filter((d) => {
-    if (statusFilter !== 'ALL' && d.approvalStatus !== statusFilter) return false;
+    if (statusFilter === 'APPEALED') {
+      if (!d.isAppealed) return false;
+    } else if (statusFilter !== 'ALL' && d.approvalStatus !== statusFilter) {
+      return false;
+    }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       return d.name.toLowerCase().includes(q) || d.phone.includes(q) || d.licensePlate.toLowerCase().includes(q);
@@ -167,7 +171,7 @@ const DriversPage = () => {
       await api.patch(`/admin/drivers/${driver.id}/approve`, { status: 'APPROVED' });
       toast.success(`Đã phê duyệt hồ sơ tài xế ${driver.name} thành công!`, 'Phê duyệt hồ sơ');
     } catch {
-      toast.success(`Đã phê duyệt hồ sơ tài xế ${driver.name} thành công!`, 'Phê duyệt');
+      // toast.success(`Đã phê duyệt hồ sơ tài xế ${driver.name} thành công!`, 'Phê duyệt');
     } finally {
       setDrivers((prev) =>
         prev.map((d) => (d.id === driver.id ? { ...d, approvalStatus: 'APPROVED' } : d))
@@ -248,6 +252,24 @@ const DriversPage = () => {
     }
   };
 
+  // Action: Resolve Driver Appeal/Complaint
+  const handleResolveAppeal = async (driver) => {
+    setProcessing(true);
+    try {
+      await api.patch(`/admin/drivers/${driver.id}/resolve-appeal`);
+      toast.success(`Đã xác nhận xử lý khiếu nại của tài xế ${driver.name}`, 'Xử lý khiếu nại');
+      setDrivers((prev) =>
+        prev.map((d) => (d.id === driver.id ? { ...d, isAppealed: false, appealNote: null } : d))
+      );
+      setSelectedDriver((prev) => (prev ? { ...prev, isAppealed: false, appealNote: null } : null));
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể xử lý khiếu nại tài xế';
+      toast.error(msg, 'Lỗi thao tác Admin');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
     <div className="admin-container">
       <div className="admin-header-bar">
@@ -292,6 +314,17 @@ const DriversPage = () => {
             onClick={() => setStatusFilter('BLOCKED')}
           >
             Bị khóa ({drivers.filter((d) => d.approvalStatus === 'BLOCKED').length})
+          </button>
+          <button
+            type="button"
+            className={`admin-filter-chip ${statusFilter === 'APPEALED' ? 'admin-filter-chip--active' : ''}`}
+            onClick={() => setStatusFilter('APPEALED')}
+            style={{
+              borderColor: statusFilter === 'APPEALED' ? '#F5A623' : undefined,
+              color: statusFilter === 'APPEALED' ? '#F5A623' : undefined,
+            }}
+          >
+            ⚠️ Có khiếu nại ({drivers.filter((d) => d.isAppealed).length})
           </button>
         </div>
 
@@ -354,17 +387,65 @@ const DriversPage = () => {
                     </td>
                     <td>
                       {isPending && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                           <span className="badge-status badge-status--pending">Chờ duyệt</span>
                           {driver.isAppealed && (
-                            <span style={{ fontSize: '0.7rem', color: '#F5A623', fontWeight: 700 }}>
-                              📢 Đã gửi khiếu nại
-                            </span>
+                            <div
+                              className="appeal-badge appeal-badge--pending"
+                              title={`Nội dung khiếu nại: "${driver.appealNote || ''}"`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDriver(driver);
+                                setShowReasonInput(false);
+                                setActionReason('');
+                              }}
+                            >
+                              <span className="appeal-badge__dot" />
+                              <span>📢 Đã gửi khiếu nại</span>
+                            </div>
                           )}
                         </div>
                       )}
-                      {isApproved && <span className="badge-status badge-status--approved">Đã duyệt</span>}
-                      {isBlocked && <span className="badge-status badge-status--blocked">Bị khóa</span>}
+                      {isApproved && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                          <span className="badge-status badge-status--approved">Đã duyệt</span>
+                          {driver.isAppealed && (
+                            <div
+                              className="appeal-badge appeal-badge--approved"
+                              title={`Nội dung khiếu nại từ tài xế: "${driver.appealNote || ''}"`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDriver(driver);
+                                setShowReasonInput(false);
+                                setActionReason('');
+                              }}
+                            >
+                              <span className="appeal-badge__dot" />
+                              <span>⚠️ Có khiếu nại</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {isBlocked && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                          <span className="badge-status badge-status--blocked">Bị khóa</span>
+                          {driver.isAppealed && (
+                            <div
+                              className="appeal-badge appeal-badge--blocked"
+                              title={`Nội dung xin mở khóa: "${driver.appealNote || ''}"`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDriver(driver);
+                                setShowReasonInput(false);
+                                setActionReason('');
+                              }}
+                            >
+                              <span className="appeal-badge__dot" />
+                              <span>📢 Yêu cầu mở khóa</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
@@ -702,17 +783,30 @@ const DriversPage = () => {
               {selectedDriver.approvalStatus === 'APPROVED' && (
                 <>
                   {!showReasonInput ? (
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      style={{ width: '100%', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
-                      onClick={() => {
-                        setReasonActionType('BLOCK');
-                        setShowReasonInput(true);
-                      }}
-                    >
-                      <HiOutlineLockClosed /> Khóa Tài Khoản
-                    </button>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {selectedDriver.isAppealed && (
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ flex: 1, background: 'var(--accent-green)', color: '#FFF' }}
+                          disabled={processing}
+                          onClick={() => handleResolveAppeal(selectedDriver)}
+                        >
+                          <HiOutlineCheckCircle /> Đã Đọc / Xử Lý Khiếu Nại
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        style={{ flex: selectedDriver.isAppealed ? 1 : undefined, width: selectedDriver.isAppealed ? undefined : '100%', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
+                        onClick={() => {
+                          setReasonActionType('BLOCK');
+                          setShowReasonInput(true);
+                        }}
+                      >
+                        <HiOutlineLockClosed /> Khóa Tài Khoản
+                      </button>
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <label style={{ fontSize: '0.8rem', color: 'var(--accent-red)', fontWeight: 600 }}>

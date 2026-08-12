@@ -34,7 +34,7 @@ const TopBar = ({ title }) => {
           <input
             type="text"
             className="input"
-            placeholder="Search vehicles, orders, or routes..."
+            placeholder="Tìm kiếm xe, đơn hàng, tuyến đường..."
           />
         </div>
 

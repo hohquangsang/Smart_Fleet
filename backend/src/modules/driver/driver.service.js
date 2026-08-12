@@ -337,10 +337,11 @@ export const submitDriverAppeal = async (userId, data) => {
     });
   }
 
-  // Preserve APPROVED status if driver is already approved, otherwise set to PENDING
-  const nextApprovalStatus = driver.approvalStatus === APPROVAL_STATUS.APPROVED
-    ? APPROVAL_STATUS.APPROVED
-    : APPROVAL_STATUS.PENDING;
+  // Preserve APPROVED or BLOCKED status if driver is already approved/blocked, otherwise set to PENDING for REJECTED drivers
+  let nextApprovalStatus = driver.approvalStatus;
+  if (driver.approvalStatus !== APPROVAL_STATUS.APPROVED && driver.approvalStatus !== APPROVAL_STATUS.BLOCKED) {
+    nextApprovalStatus = APPROVAL_STATUS.PENDING;
+  }
 
   // Update driver details, set isAppealed to true
   const updatedDriver = await prisma.driver.update({
