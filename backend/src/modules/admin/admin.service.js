@@ -264,21 +264,40 @@ export const getDashboardStats = async () => {
  * Get all orders with filters and pagination.
  */
 export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}) => {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 20);
+
   const where = {};
-  if (status) where.status = status;
-  if (search) {
+
+  if (status && status !== 'ALL') {
+    if (status === 'PROCESSING' || status === 'IN_PROGRESS') {
+      where.status = { in: ['PENDING', 'DISPATCHING', 'DRIVER_ACCEPTED', 'MATCHED', 'IN_TRANSIT', 'PICKED_UP'] };
+    } else if (status === 'DELIVERED') {
+      where.status = { in: ['DELIVERED', 'COMPLETED'] };
+    } else if (status === 'EXPIRED') {
+      where.status = { in: ['EXPIRED_NO_DRIVER', 'CANCELLED'] };
+    } else {
+      where.status = status;
+    }
+  }
+
+  if (search && search.trim()) {
+    const term = search.trim();
     where.OR = [
-      { pickupAddress: { contains: search, mode: 'insensitive' } },
-      { dropoffAddress: { contains: search, mode: 'insensitive' } },
+      { pickupAddress: { contains: term, mode: 'insensitive' } },
+      { dropoffAddress: { contains: term, mode: 'insensitive' } },
+      { id: { contains: term, mode: 'insensitive' } },
+      { customer: { fullName: { contains: term, mode: 'insensitive' } } },
+      { customer: { phoneNumber: { contains: term, mode: 'insensitive' } } },
     ];
   }
 
-  const [orders, total] = await Promise.all([
+  const [orders, total, allCount, processingCount, deliveredCount, expiredCount] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
       include: {
         customer: { select: { id: true, fullName: true, phoneNumber: true, email: true } },
         driver: {
@@ -289,9 +308,31 @@ export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}
       },
     }),
     prisma.order.count({ where }),
+    prisma.order.count(),
+    prisma.order.count({
+      where: { status: { in: ['PENDING', 'DISPATCHING', 'DRIVER_ACCEPTED', 'MATCHED', 'IN_TRANSIT', 'PICKED_UP'] } },
+    }),
+    prisma.order.count({
+      where: { status: { in: ['DELIVERED', 'COMPLETED'] } },
+    }),
+    prisma.order.count({
+      where: { status: { in: ['EXPIRED_NO_DRIVER', 'CANCELLED'] } },
+    }),
   ]);
 
-  return { orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return {
+    orders,
+    total,
+    page: pageNum,
+    limit: limitNum,
+    totalPages: Math.ceil(total / limitNum) || 1,
+    counts: {
+      all: allCount,
+      processing: processingCount,
+      delivered: deliveredCount,
+      expired: expiredCount,
+    },
+  };
 };
 
 /**

@@ -509,11 +509,48 @@ export const getOrderById = async (orderId) => {
           user: { select: { fullName: true, phoneNumber: true } },
         },
       },
+      locationHistories: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
     },
   });
 
   if (!order) throw new NotFoundError('Order not found');
-  return order;
+
+  let driverLocation = null;
+  if (order.driverId) {
+    try {
+      const redisLoc = await redis.hgetall(REDIS_KEYS.DRIVER_LOCATION(order.driverId));
+      if (redisLoc && redisLoc.lat && redisLoc.lng) {
+        driverLocation = {
+          lat: parseFloat(redisLoc.lat),
+          lng: parseFloat(redisLoc.lng),
+          speed: parseFloat(redisLoc.speed || 0),
+          heading: parseFloat(redisLoc.heading || 0),
+          updatedAt: redisLoc.updatedAt,
+        };
+      }
+    } catch {
+      // Redis fallback
+    }
+
+    if (!driverLocation && order.locationHistories && order.locationHistories.length > 0) {
+      const lastLoc = order.locationHistories[0];
+      driverLocation = {
+        lat: lastLoc.latitude,
+        lng: lastLoc.longitude,
+        speed: lastLoc.speed ? Number(lastLoc.speed) : 0,
+        heading: lastLoc.heading ? Number(lastLoc.heading) : 0,
+        updatedAt: lastLoc.createdAt,
+      };
+    }
+  }
+
+  return {
+    ...order,
+    driverLocation,
+  };
 };
 
 /**

@@ -16,6 +16,9 @@ export const emitCustomerOrderStatus = (customerId, { orderId, status, label, dr
       const customerNs = io.of('/customer');
       customerNs.to(`customer:${customerId}`).emit('order:status-update', payload);
       customerNs.to(`user:${customerId}`).emit('order:status-update', payload);
+      if (orderId) {
+        customerNs.to(`order:${orderId}`).emit('order:status-update', payload);
+      }
     }
   } catch {
     // Socket not initialized in CLI test mode

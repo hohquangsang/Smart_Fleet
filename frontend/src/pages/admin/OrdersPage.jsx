@@ -1,27 +1,78 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback } from 'react';
 import {
-  HiOutlineClipboardList,
   HiOutlineSearch,
-  HiOutlineCheckCircle,
-  HiOutlineLightningBolt,
+  HiOutlineRefresh,
+  HiChevronRight,
+  HiChevronLeft,
   HiOutlineX,
-  HiOutlineTruck,
-  HiOutlineClock,
+  HiOutlineLightningBolt,
+  HiOutlineCheckCircle,
 } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
 import { SocketContext } from '../../contexts/SocketContext';
 import '../../styles/admin.css';
 
-const STATUS_LABELS = {
-  PENDING: { label: 'Chờ duyệt', color: '#F5A623', bg: 'rgba(245,166,35,0.12)' },
-  DISPATCHING: { label: 'Đang phân phối', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
-  DRIVER_ACCEPTED: { label: 'Tài xế đã nhận', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)' },
-  MATCHED: { label: 'Đã khớp tài xế', color: '#06B6D4', bg: 'rgba(6,182,212,0.12)' },
-  IN_TRANSIT: { label: 'Đang giao', color: '#33D69F', bg: 'rgba(51,214,159,0.12)' },
-  DELIVERED: { label: 'Đã giao', color: '#33D69F', bg: 'rgba(51,214,159,0.15)' },
-  CANCELLED: { label: 'Đã hủy', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
-  EXPIRED_NO_DRIVER: { label: 'Hết hạn', color: '#9CA3AF', bg: 'rgba(156,163,175,0.12)' },
+// Helper: Trích xuất 2 chữ cái đầu của tên khách hàng
+const getInitials = (name) => {
+  if (!name) return 'KH';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+// Helper: Định dạng thời gian theo kiểu '14:12 · 13/8' hoặc '14:02 · hôm nay'
+const formatOrderTime = (dateStr) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const timePart = `${hours}:${minutes}`;
+
+  const today = new Date();
+  const isToday =
+    d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
+
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+
+  if (isToday) return `${timePart} · hôm nay`;
+  if (isYesterday) return `${timePart} · hôm qua`;
+
+  return `${timePart} · ${d.getDate()}/${d.getMonth() + 1}`;
+};
+
+// Helper: Lấy thông tin hiển thị trạng thái (màu sắc & label)
+const getStatusInfo = (status) => {
+  switch (status) {
+    case 'DELIVERED':
+    case 'COMPLETED':
+      return { label: '• Đã giao', className: 'status-pill--green' };
+    case 'EXPIRED_NO_DRIVER':
+    case 'CANCELLED':
+      return { label: '• Hết hạn', className: 'status-pill--gray' };
+    case 'IN_TRANSIT':
+    case 'PICKED_UP':
+      return { label: '• Đang giao', className: 'status-pill--amber' };
+    case 'PENDING':
+      return { label: '• Chờ duyệt', className: 'status-pill--amber' };
+    case 'DISPATCHING':
+      return { label: '• Đang xử lý', className: 'status-pill--blue' };
+    case 'DRIVER_ACCEPTED':
+      return { label: '• TX đã nhận', className: 'status-pill--purple' };
+    case 'MATCHED':
+      return { label: '• Đã khớp', className: 'status-pill--blue' };
+    default:
+      return { label: `• ${status || 'Chưa rõ'}`, className: 'status-pill--gray' };
+  }
 };
 
 const AdminOrdersPage = () => {
@@ -32,77 +83,89 @@ const AdminOrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState({ all: 0, processing: 0, delivered: 0, expired: 0 });
+
   const [processing, setProcessing] = useState(null); // orderId đang xử lý
-  const [selectedOrder, setSelectedOrder] = useState(null); // chi tiết modal
+  const [selectedOrder, setSelectedOrder] = useState(null); // modal chi tiết
 
   // ─── Fetch danh sách đơn từ API ────────────────────────────
-  const fetchOrders = async () => {
-    try {
-      const params = {};
-      if (statusFilter !== 'ALL') params.status = statusFilter;
-      if (searchTerm) params.search = searchTerm;
+  const fetchOrders = useCallback(
+    async (targetPage = page) => {
+      setLoading(true);
+      try {
+        const params = {
+          page: targetPage,
+          limit: 10,
+        };
+        if (statusFilter !== 'ALL') params.status = statusFilter;
+        if (searchTerm.trim()) params.search = searchTerm.trim();
 
-      const { data } = await api.get('/admin/orders', { params });
-      setOrders(data.data?.orders || []);
-    } catch {
-      // Fallback
-    } finally {
-      setLoading(false);
+        const { data } = await api.get('/admin/orders', { params });
+
+        if (data.success && data.data) {
+          setOrders(data.data.orders || []);
+          setTotal(data.data.total || 0);
+          setTotalPages(data.data.totalPages || 1);
+          if (data.data.counts) {
+            setCounts(data.data.counts);
+          }
+        }
+      } catch {
+        toast.error('Lỗi khi tải danh sách đơn hàng', 'Thất bại');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, statusFilter, searchTerm, toast]
+  );
+
+  useEffect(() => {
+    fetchOrders(page);
+  }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Khi tìm kiếm, reset về trang 1
+  const handleSearchSubmit = (e) => {
+    if (e.key === 'Enter') {
+      setPage(1);
+      fetchOrders(1);
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Switch filter tab
+  const handleTabChange = (newStatus) => {
+    setStatusFilter(newStatus);
+    setPage(1);
+  };
 
-  // ─── Socket: nhận đơn mới real-time ────────────────────────
+  // ─── Socket: nhận đơn mới & cập nhật trạng thái real-time ──
   useEffect(() => {
     if (!socket) return;
 
     const handleNewOrder = (orderData) => {
-      console.log('📋 [Admin] admin:new-order-request received:', orderData);
+      console.log('📋 [Admin] Socket order new:', orderData);
       toast.info(
         `Đơn mới từ ${orderData.customerName || 'Khách hàng'} — ${orderData.totalFare?.toLocaleString('vi-VN') || '?'}đ`,
         '📦 Đơn hàng mới'
       );
-      // Thêm đơn mới vào đầu danh sách
-      setOrders((prev) => [
-        {
-          id: orderData.orderId,
-          status: 'PENDING',
-          customer: { fullName: orderData.customerName },
-          pickupAddress: orderData.pickupAddress,
-          dropoffAddress: orderData.dropoffAddress,
-          totalFare: orderData.totalFare,
-          vehicleType: orderData.vehicleType,
-          createdAt: orderData.createdAt,
-        },
-        ...prev.filter((o) => o.id !== orderData.orderId),
-      ]);
+      fetchOrders(page);
     };
 
     const handleDriverAccepted = (data) => {
-      console.log('🤝 [Admin] admin:driver-accepted received:', data);
+      console.log('🤝 [Admin] Socket driver accepted:', data);
       const driverInfo = data.driverInfo || data.driver;
       toast.success(
-        `Tài xế ${driverInfo?.name || '?'} (${driverInfo?.licensePlate || ''}) đã nhận đơn ${data.orderId?.slice(-8).toUpperCase()} — ĐANG GIAO`,
+        `Tài xế ${driverInfo?.name || '?'} đã nhận đơn ${data.orderId?.slice(-8).toUpperCase()}`,
         'Tài xế nhận đơn'
       );
-      // Cập nhật status đơn hàng trong list thành IN_TRANSIT
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === data.orderId ? { ...o, status: 'IN_TRANSIT', driver: driverInfo } : o
-        )
-      );
+      fetchOrders(page);
     };
 
     const handleOrderStatusUpdate = (data) => {
-      console.log('🔄 [Admin] admin:order-status-update received:', data);
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === data.orderId ? { ...o, status: data.status, ...(data.driver ? { driver: data.driver } : {}) } : o
-        )
-      );
+      console.log('🔄 [Admin] Socket status update:', data);
+      fetchOrders(page);
     };
 
     socket.on('admin:new-order-request', handleNewOrder);
@@ -114,18 +177,18 @@ const AdminOrdersPage = () => {
       socket.off('admin:driver-accepted', handleDriverAccepted);
       socket.off('admin:order-status-update', handleOrderStatusUpdate);
     };
-  }, [socket, toast]);
+  }, [socket, toast, fetchOrders, page]);
 
   // ─── Dispatch đơn hàng đến drivers ─────────────────────────
   const handleDispatch = async (orderId) => {
     setProcessing(orderId);
     try {
       await api.post(`/orders/${orderId}/dispatch`);
-      toast.success('Đã phân phối đơn đến tài xế online! Đang đợi tài xế nhận...', 'Dispatch thành công');
-      // Cập nhật status local ngay
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'DISPATCHING' } : o))
-      );
+      toast.success('Đã phân phối đơn đến tài xế online!', 'Dispatch thành công');
+      fetchOrders(page);
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: 'DISPATCHING' } : null));
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Dispatch thất bại';
       toast.error(msg, 'Lỗi dispatch');
@@ -134,15 +197,16 @@ const AdminOrdersPage = () => {
     }
   };
 
-  // ─── Confirm match (admin xác nhận sau khi driver nhận) ────
+  // ─── Confirm match ─────────────────────────────────────────
   const handleConfirmMatch = async (orderId) => {
     setProcessing(orderId);
     try {
       await api.post(`/orders/${orderId}/confirm-match`);
-      toast.success('Đã xác nhận khớp tài xế! Đơn hàng chuyển sang MATCHED.', 'Confirm Match');
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'MATCHED' } : o))
-      );
+      toast.success('Đã xác nhận khớp tài xế!', 'Confirm Match');
+      fetchOrders(page);
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: 'MATCHED' } : null));
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Confirm match thất bại';
       toast.error(msg, 'Lỗi');
@@ -151,317 +215,512 @@ const AdminOrdersPage = () => {
     }
   };
 
-  // ─── Filter + Search ────────────────────────────────────────
-  const filteredOrders = orders.filter((o) => {
-    const matchStatus = statusFilter === 'ALL' || o.status === statusFilter;
-    const matchSearch =
-      !searchTerm ||
-      o.pickupAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.dropoffAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.customer?.fullName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchStatus && matchSearch;
-  });
-
   return (
-    <div className="admin-container">
+    <div className="admin-container admin-orders-container">
+      {/* Header Bar */}
       <div className="admin-header-bar">
         <div>
-          <h1 className="admin-title">Quản Lý Đơn Hàng</h1>
+          <h1 className="admin-title">Quản lý đơn hàng</h1>
           <p className="admin-subtitle">
-            Real-time via Socket.IO · Admin dispatch & confirm match
+            Real-time qua Socket.IO - Admin dispatch & confirm match
           </p>
         </div>
         <button
           type="button"
-          className="btn-primary"
-          onClick={fetchOrders}
-          style={{
-            background: 'var(--accent-blue)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            padding: '8px 18px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
+          className="orders-reload-btn"
+          onClick={() => fetchOrders(page)}
         >
-          <HiOutlineClipboardList /> Tải lại
+          <HiOutlineRefresh style={{ fontSize: '1.1rem' }} /> Tải lại
         </button>
       </div>
 
-      {/* ─── FILTER + SEARCH ────────────────────────── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-          <HiOutlineSearch
-            style={{
-              position: 'absolute',
-              left: 12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Tìm kiếm địa chỉ, khách hàng..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
-            style={{
-              width: '100%',
-              paddingLeft: 36,
-              padding: '9px 12px 9px 36px',
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: 8,
-              color: 'var(--text-primary)',
-              fontSize: '0.9rem',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
-
-        {/* Status Filter */}
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-primary)',
-            borderRadius: 8,
-            color: 'var(--text-primary)',
-            padding: '9px 14px',
-            fontSize: '0.9rem',
-          }}
-        >
-          <option value="ALL">Tất cả trạng thái</option>
-          <option value="PENDING">Chờ duyệt</option>
-          <option value="DISPATCHING">Đang phân phối</option>
-          <option value="DRIVER_ACCEPTED">Tài xế đã nhận</option>
-          <option value="MATCHED">Đã khớp</option>
-          <option value="IN_TRANSIT">Đang giao</option>
-          <option value="DELIVERED">Đã giao</option>
-          <option value="CANCELLED">Đã hủy</option>
-        </select>
+      {/* Search Input */}
+      <div className="orders-search-wrapper">
+        <HiOutlineSearch className="orders-search-icon" />
+        <input
+          type="text"
+          className="orders-search-input"
+          placeholder="Tìm địa chỉ, khách hàng..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleSearchSubmit}
+        />
       </div>
 
-      {/* ─── DANH SÁCH ĐƠN HÀNG ──────────────────────── */}
-      {loading ? (
-        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>
-          Đang tải dữ liệu...
-        </div>
-      ) : filteredOrders.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            color: 'var(--text-muted)',
-            padding: '3rem',
-            background: 'var(--bg-secondary)',
-            borderRadius: 12,
-            border: '1px solid var(--border-primary)',
-          }}
+      {/* Status Filter Tabs */}
+      <div className="orders-tab-bar">
+        <button
+          type="button"
+          className={`orders-tab-btn ${statusFilter === 'ALL' ? 'orders-tab-btn--active' : ''}`}
+          onClick={() => handleTabChange('ALL')}
         >
-          <HiOutlineClipboardList style={{ fontSize: '2.5rem', marginBottom: 8 }} />
-          <div>Chưa có đơn hàng nào</div>
-          <div style={{ fontSize: '0.8rem', marginTop: 4 }}>
-            Đơn mới sẽ hiện tự động qua Socket.IO
+          Tất cả {counts.all}
+        </button>
+        <button
+          type="button"
+          className={`orders-tab-btn ${statusFilter === 'PROCESSING' ? 'orders-tab-btn--active' : ''}`}
+          onClick={() => handleTabChange('PROCESSING')}
+        >
+          Đang xử lý {counts.processing}
+        </button>
+        <button
+          type="button"
+          className={`orders-tab-btn ${statusFilter === 'DELIVERED' ? 'orders-tab-btn--active' : ''}`}
+          onClick={() => handleTabChange('DELIVERED')}
+        >
+          Đã giao {counts.delivered}
+        </button>
+        <button
+          type="button"
+          className={`orders-tab-btn ${statusFilter === 'EXPIRED' ? 'orders-tab-btn--active' : ''}`}
+          onClick={() => handleTabChange('EXPIRED')}
+        >
+          Hết hạn {counts.expired}
+        </button>
+      </div>
+
+      {/* Orders Table Container */}
+      <div className="orders-table-card">
+        {loading ? (
+          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '3rem' }}>
+            Đang tải dữ liệu đơn hàng...
+          </div>
+        ) : orders.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '3rem' }}>
+            Không có đơn hàng nào phù hợp với bộ lọc
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="orders-table">
+              <thead>
+                <tr>
+                  <th>TRẠNG THÁI</th>
+                  <th>KHÁCH HÀNG</th>
+                  <th>TUYẾN ĐƯỜNG</th>
+                  <th>GIÁ</th>
+                  <th>THỜI GIAN</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const statusInfo = getStatusInfo(order.status);
+                  const customerName =
+                    order.customer?.fullName || order.customerName || 'Khách hàng';
+                  const initials = getInitials(customerName);
+                  const orderCode = `#${order.id?.slice(-8).toUpperCase() || '—'}`;
+
+                  return (
+                    <tr
+                      key={order.id}
+                      className="orders-table-row"
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      {/* TRẠNG THÁI */}
+                      <td>
+                        <span className={`status-pill ${statusInfo.className}`}>
+                          {statusInfo.label}
+                        </span>
+                      </td>
+
+                      {/* KHÁCH HÀNG */}
+                      <td>
+                        <div className="customer-cell">
+                          <div className="customer-avatar">{initials}</div>
+                          <div className="customer-info">
+                            <span className="customer-name">{customerName}</span>
+                            <span className="customer-code">{orderCode}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* TUYẾN ĐƯỜNG */}
+                      <td>
+                        <div className="route-cell">
+                          <span className="route-dot route-dot--green"></span>
+                          <span
+                            style={{
+                              maxWidth: 180,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                            }}
+                            title={order.pickupAddress}
+                          >
+                            {order.pickupAddress || '—'}
+                          </span>
+                          <span className="route-arrow">→</span>
+                          <span className="route-dot route-dot--blue"></span>
+                          <span
+                            style={{
+                              maxWidth: 180,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                            }}
+                            title={order.dropoffAddress}
+                          >
+                            {order.dropoffAddress || '—'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* GIÁ */}
+                      <td>
+                        <span className="fare-text">
+                          {Number(order.totalFare || 0).toLocaleString('vi-VN')}đ
+                        </span>
+                      </td>
+
+                      {/* THỜI GIAN */}
+                      <td>
+                        <span className="time-text">
+                          {formatOrderTime(order.createdAt)}
+                        </span>
+                      </td>
+
+                      {/* ACTION / CHEVRON */}
+                      <td style={{ textAlign: 'right' }}>
+                        <HiChevronRight className="chevron-icon" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer & Pagination */}
+        <div className="orders-table-footer">
+          <div className="orders-footer-info">
+            Hiển thị {orders.length} trên {total} đơn hàng
+          </div>
+
+          <div className="orders-pagination">
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <HiChevronLeft />
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pNum) => (
+              <button
+                key={pNum}
+                type="button"
+                className={`pagination-btn ${pNum === page ? 'pagination-btn--active' : ''}`}
+                onClick={() => setPage(pNum)}
+              >
+                {pNum}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              <HiChevronRight />
+            </button>
           </div>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filteredOrders.map((order) => {
-            const statusInfo = STATUS_LABELS[order.status] || { label: order.status, color: '#9CA3AF', bg: 'rgba(156,163,175,0.12)' };
-            const isProcessing = processing === order.id;
+      </div>
 
-            return (
-              <div
-                key={order.id}
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-primary)',
-                  borderRadius: 12,
-                  padding: '1.2rem 1.4rem',
-                  display: 'flex',
-                  gap: 16,
-                  alignItems: 'flex-start',
-                  transition: 'border-color 0.2s',
-                }}
-              >
-                {/* Status badge */}
-                <div
-                  style={{
-                    minWidth: 120,
-                    background: statusInfo.bg,
-                    color: statusInfo.color,
-                    borderRadius: 8,
-                    padding: '4px 10px',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    textAlign: 'center',
-                    border: `1px solid ${statusInfo.color}30`,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {statusInfo.label}
-                </div>
-
-                {/* Thông tin đơn */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--accent-blue)', fontSize: '0.85rem' }}>
-                      #{order.id?.slice(-8).toUpperCase() || '?'}
-                    </span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      <HiOutlineClock style={{ verticalAlign: 'middle' }} />
-                      {' '}
-                      {order.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '—'}
-                    </span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent-green)' }}>
-                      {order.totalFare ? `${Number(order.totalFare).toLocaleString('vi-VN')}đ` : '—'}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    <strong>KH:</strong> {order.customer?.fullName || '—'}
-                    {order.driver?.name && (
-                      <span style={{ marginLeft: 12 }}>
-                        <HiOutlineTruck style={{ verticalAlign: 'middle' }} />{' '}
-                        <strong>TX:</strong> {order.driver.name} · {order.driver.licensePlate || ''}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    📍 <span style={{ color: 'var(--accent-green)' }}>{order.pickupAddress || '—'}</span>
-                    {' → '}
-                    🏁 <span style={{ color: 'var(--accent-blue)' }}>{order.dropoffAddress || '—'}</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 140 }}>
-                  {/* PENDING → Dispatch */}
-                  {order.status === 'PENDING' && (
-                    <button
-                      type="button"
-                      onClick={() => handleDispatch(order.id)}
-                      disabled={isProcessing}
-                      style={{
-                        background: 'var(--accent-blue)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 8,
-                        padding: '8px 14px',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        cursor: isProcessing ? 'not-allowed' : 'pointer',
-                        opacity: isProcessing ? 0.6 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <HiOutlineLightningBolt />
-                      {isProcessing ? 'Đang gửi...' : 'Dispatch'}
-                    </button>
-                  )}
-
-                  {/* DRIVER_ACCEPTED → Confirm Match */}
-                  {order.status === 'DRIVER_ACCEPTED' && (
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmMatch(order.id)}
-                      disabled={isProcessing}
-                      style={{
-                        background: '#8B5CF6',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 8,
-                        padding: '8px 14px',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        cursor: isProcessing ? 'not-allowed' : 'pointer',
-                        opacity: isProcessing ? 0.6 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <HiOutlineCheckCircle />
-                      {isProcessing ? 'Đang xác nhận...' : 'Confirm Match'}
-                    </button>
-                  )}
-
-                  {/* View detail */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOrder(order)}
-                    style={{
-                      background: 'transparent',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--border-primary)',
-                      borderRadius: 8,
-                      padding: '6px 12px',
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Chi tiết
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ─── MODAL CHI TIẾT ─────────────────────────── */}
+      {/* ─── MODAL CHI TIẾT ĐƠN HÀNG ─────────────────────────────── */}
       {selectedOrder && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            padding: '1rem',
           }}
           onClick={() => setSelectedOrder(null)}
         >
           <div
             style={{
-              background: 'var(--bg-primary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: 14,
-              padding: '2rem',
-              width: 480,
-              maxWidth: '95vw',
-              maxHeight: '80vh',
-              overflowY: 'auto',
+              background: '#111622',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 16,
+              padding: '1.75rem',
+              width: 520,
+              maxWidth: '100%',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-                Chi tiết đơn #{selectedOrder.id?.slice(-8).toUpperCase()}
-              </h3>
+            {/* Header Modal */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.25rem',
+                paddingBottom: '1rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    color: '#ffffff',
+                    margin: 0,
+                    fontSize: '1.2rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  Chi Tiết Đơn Hàng #{selectedOrder.id?.slice(-8).toUpperCase()}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  Thông tin vận chuyển thực thời trên SmartFleet
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.4rem' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '1.5rem',
+                }}
               >
                 <HiOutlineX />
               </button>
             </div>
 
-            <pre style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {JSON.stringify(selectedOrder, null, 2)}
-            </pre>
+            {/* 8 thông tin chi tiết */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* 1. Khách hàng */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>👤 Tên khách hàng:</span>
+                <strong style={{ color: '#ffffff', fontSize: '0.9rem' }}>
+                  {selectedOrder.customer?.fullName || selectedOrder.customerName || 'Chưa cập nhật'}
+                </strong>
+              </div>
+
+              {/* 2. Order ID */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🆔 OrderID:</span>
+                <strong style={{ color: '#ffffff', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                  {selectedOrder.id}
+                </strong>
+              </div>
+
+              {/* 3. Tên Tài xế */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🚚 Tên Tài xế:</span>
+                <strong style={{ color: selectedOrder.driver ? '#ffffff' : '#94a3b8', fontSize: '0.9rem' }}>
+                  {selectedOrder.driver?.user?.fullName ||
+                    selectedOrder.driver?.fullName ||
+                    selectedOrder.driver?.name ||
+                    'Chưa gán tài xế'}
+                </strong>
+              </div>
+
+              {/* 4. Phương tiện */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🛵 Phương tiện:</span>
+                <strong style={{ color: '#ffffff', fontSize: '0.9rem' }}>
+                  {selectedOrder.driver?.vehicleType || selectedOrder.vehicleType || 'Xe Máy Express'}
+                </strong>
+              </div>
+
+              {/* 5. Điểm đón */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>📍 Điểm đón:</span>
+                <strong style={{ color: '#10b981', fontSize: '0.88rem' }}>
+                  {selectedOrder.pickupAddress || 'Chưa cập nhật'}
+                </strong>
+              </div>
+
+              {/* 6. Điểm đến */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>🏁 Điểm đến:</span>
+                <strong style={{ color: '#3b82f6', fontSize: '0.88rem' }}>
+                  {selectedOrder.dropoffAddress || 'Chưa cập nhật'}
+                </strong>
+              </div>
+
+              {/* 7. Thời gian */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  background: '#161c2d',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>⏰ Thời gian:</span>
+                <strong style={{ color: '#ffffff', fontSize: '0.88rem' }}>
+                  {selectedOrder.createdAt
+                    ? new Date(selectedOrder.createdAt).toLocaleString('vi-VN')
+                    : 'Chưa cập nhật'}
+                </strong>
+              </div>
+
+              {/* 8. Giá tiền */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                }}
+              >
+                <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.9rem' }}>
+                  💵 Giá tiền:
+                </span>
+                <strong style={{ color: '#10b981', fontSize: '1.2rem', fontWeight: 800 }}>
+                  {selectedOrder.totalFare
+                    ? `${Number(selectedOrder.totalFare).toLocaleString('vi-VN')} đ`
+                    : '0 đ'}
+                </strong>
+              </div>
+            </div>
+
+            {/* Actions Footer inside modal */}
+            <div style={{ marginTop: '1.25rem', display: 'flex', gap: 10 }}>
+              {selectedOrder.status === 'PENDING' && (
+                <button
+                  type="button"
+                  onClick={() => handleDispatch(selectedOrder.id)}
+                  disabled={processing === selectedOrder.id}
+                  style={{
+                    flex: 1,
+                    background: '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <HiOutlineLightningBolt />
+                  {processing === selectedOrder.id ? 'Đang gửi...' : 'Dispatch Đơn'}
+                </button>
+              )}
+
+              {selectedOrder.status === 'DRIVER_ACCEPTED' && (
+                <button
+                  type="button"
+                  onClick={() => handleConfirmMatch(selectedOrder.id)}
+                  disabled={processing === selectedOrder.id}
+                  style={{
+                    flex: 1,
+                    background: '#8b5cf6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <HiOutlineCheckCircle />
+                  {processing === selectedOrder.id ? 'Đang xác nhận...' : 'Confirm Match'}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                style={{
+                  flex: selectedOrder.status === 'PENDING' || selectedOrder.status === 'DRIVER_ACCEPTED' ? 0.5 : 1,
+                  background: '#252f44',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
