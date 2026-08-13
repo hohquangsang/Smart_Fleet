@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
+import { AdminNotificationProvider } from './contexts/AdminNotificationContext';
 import { router } from './router';
 import './styles/global.css';
 import './styles/components.css';
@@ -19,7 +20,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ToastProvider>
       <AuthProvider>
         <SocketProvider>
-          <RouterProvider router={router} />
+          <AdminNotificationProvider>
+            <RouterProvider router={router} />
+          </AdminNotificationProvider>
         </SocketProvider>
       </AuthProvider>
     </ToastProvider>

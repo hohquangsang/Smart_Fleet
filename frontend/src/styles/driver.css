@@ -29,7 +29,7 @@
 /* ─── Online / Offline Toggle Switch ────────────────────────── */
 .online-toggle-wrapper {
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
@@ -205,8 +205,13 @@
 }
 
 @keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 .dispatch-header {
@@ -232,8 +237,17 @@
 }
 
 @keyframes pulseOrange {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.96); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
 }
 
 /* Vòng tròn đếm ngược SVG */
@@ -468,16 +482,19 @@
 
 /* Responsive Rules */
 @media (max-width: 992px) {
+
   .dashboard-driver-layout,
   .active-trip-layout {
     grid-template-columns: 1fr;
   }
+
   .earnings-overview-cards,
   .gauges-grid,
   .profile-documents-grid,
   .profile-form-grid {
     grid-template-columns: 1fr;
   }
+
   .dispatch-bottom-sheet {
     width: 100vw;
     max-width: 100vw;
@@ -631,4 +648,3 @@
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
 }
-

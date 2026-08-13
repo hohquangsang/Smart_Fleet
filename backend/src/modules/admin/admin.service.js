@@ -4,6 +4,39 @@ import { NotFoundError, BadRequestError } from '../../utils/api-error.js';
 import { APPROVAL_STATUS, ORDER_STATUS, REDIS_KEYS, DRIVER_STATUS } from '../../utils/constants.js';
 
 /**
+ * Get real-time badge counts for admin sidebar (orders, drivers, users).
+ */
+export const getBadgeCounts = async () => {
+  const [pendingOrdersCount, pendingDriversCount, appealedUsersCount] = await Promise.all([
+    prisma.order.count({
+      where: {
+        status: { in: [ORDER_STATUS.PENDING, ORDER_STATUS.DISPATCHING] },
+      },
+    }),
+    prisma.driver.count({
+      where: {
+        OR: [
+          { approvalStatus: APPROVAL_STATUS.PENDING },
+          { isAppealed: true },
+        ],
+      },
+    }),
+    prisma.user.count({
+      where: {
+        role: 'CUSTOMER',
+        isAppealed: true,
+      },
+    }),
+  ]);
+
+  return {
+    ordersCount: pendingOrdersCount,
+    driversCount: pendingDriversCount,
+    usersCount: appealedUsersCount,
+  };
+};
+
+/**
  * Get dashboard statistics with full real-time metrics, recent orders, pending driver list, 7-day analytics, and live map points.
  */
 export const getDashboardStats = async () => {

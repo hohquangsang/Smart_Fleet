@@ -122,9 +122,18 @@ export const emitDriverApprovalUpdated = (userId, approvalData) => {
   try {
     const io = getIO();
     if (io) {
-      io.of('/driver').to(`user:${userId}`).emit('driver:approval-updated', approvalData);
+      const payload = {
+        ...approvalData,
+        timestamp: new Date().toISOString(),
+      };
+      // Broadcast to both customer & driver namespaces
+      io.of('/customer').to(`user:${userId}`).emit('driver:approval-updated', payload);
+      io.of('/customer').to(`user:${userId}`).emit('role:status-updated', payload);
+
+      io.of('/driver').to(`user:${userId}`).emit('driver:approval-updated', payload);
+      io.of('/driver').to(`user:${userId}`).emit('role:status-updated', payload);
       if (approvalData.driverId) {
-        io.of('/driver').to(`driver:${approvalData.driverId}`).emit('driver:approval-updated', approvalData);
+        io.of('/driver').to(`driver:${approvalData.driverId}`).emit('driver:approval-updated', payload);
       }
     }
   } catch {

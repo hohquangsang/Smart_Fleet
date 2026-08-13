@@ -290,13 +290,12 @@ const DriverDashboard = () => {
                 {isOnline ? 'ONLINE (SẴN SÀNG)' : 'OFFLINE (TẠM NGHỈ)'}
               </span>
               <span
-                className={`approval-badge ${
-                  approvalStatus === 'APPROVED'
+                className={`approval-badge ${approvalStatus === 'APPROVED'
                     ? 'approval-badge--approved'
                     : approvalStatus === 'REJECTED'
-                    ? 'approval-badge--rejected'
-                    : 'approval-badge--pending'
-                }`}
+                      ? 'approval-badge--rejected'
+                      : 'approval-badge--pending'
+                  }`}
                 style={{
                   ...(approvalStatus === 'REJECTED' && {
                     background: 'rgba(239, 68, 68, 0.15)',
@@ -538,7 +537,7 @@ const DriverDashboard = () => {
             style={{ width: '100%', padding: '0.85rem', background: 'var(--gradient-blue)' }}
             onClick={() => navigate('/driver/dispatch')}
           >
-            Mở Trạm Nhận Đơn Real-Time 🚀
+            Mở Trạm Nhận Đơn Real-Time
           </button>
         </div>
       </div>

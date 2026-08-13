@@ -1,24 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout, HiOutlineUser } from 'react-icons/hi';
+import useAdminNotifications from '../../hooks/useAdminNotifications';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/sidebar.css';
-
-const adminNavGroups = [
-  {
-    groupTitle: null,
-    items: [
-      { path: '/admin', label: 'Tổng quan', icon: <HiOutlineViewGrid /> },
-    ],
-  },
-  {
-    groupTitle: 'QUẢN LÝ',
-    items: [
-      { path: '/admin/orders', label: 'Đơn hàng', icon: <HiOutlineShoppingCart />, badge: null },
-      { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers />, badge: null },
-      { path: '/admin/users', label: 'Người dùng', icon: <HiOutlineUserGroup /> },
-    ],
-  },
-];
 
 const customerNavItems = [
   { path: '/customer', label: 'Đặt đơn & Tính cước', icon: <HiOutlineShoppingCart /> },
@@ -37,6 +21,37 @@ const driverNavItems = [
 
 const Sidebar = () => {
   const { user, logout, isAdmin, isDriver } = useAuth();
+  const { badgeCounts } = useAdminNotifications();
+
+  const getAdminBadge = (path) => {
+    if (path === '/admin/orders' && badgeCounts.ordersCount > 0) {
+      return { count: badgeCounts.ordersCount, color: 'var(--accent-red)' };
+    }
+    if (path === '/admin/drivers' && badgeCounts.driversCount > 0) {
+      return { count: badgeCounts.driversCount, color: '#F5A623' };
+    }
+    if (path === '/admin/users' && badgeCounts.usersCount > 0) {
+      return { count: badgeCounts.usersCount, color: 'var(--accent-blue)' };
+    }
+    return null;
+  };
+
+  const adminNavGroups = [
+    {
+      groupTitle: null,
+      items: [
+        { path: '/admin', label: 'Tổng quan', icon: <HiOutlineViewGrid /> },
+      ],
+    },
+    {
+      groupTitle: 'QUẢN LÝ',
+      items: [
+        { path: '/admin/orders', label: 'Đơn hàng', icon: <HiOutlineShoppingCart /> },
+        { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers /> },
+        { path: '/admin/users', label: 'Người dùng', icon: <HiOutlineUserGroup /> },
+      ],
+    },
+  ];
 
   const initials = user?.fullName
     ?.split(' ')
@@ -71,27 +86,30 @@ const Sidebar = () => {
                   {grp.groupTitle}
                 </div>
               )}
-              {grp.items.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === '/admin'}
-                  className={({ isActive }) =>
-                    `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
-                  }
-                >
-                  <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span className="sidebar__nav-label">{item.label}</span>
-                  {item.badge && (
-                    <span
-                      className="sidebar__badge"
-                      style={{ background: item.badgeColor || 'var(--accent-red)' }}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
+              {grp.items.map((item) => {
+                const badgeInfo = getAdminBadge(item.path);
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/admin'}
+                    className={({ isActive }) =>
+                      `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
+                    }
+                  >
+                    <span className="sidebar__nav-icon">{item.icon}</span>
+                    <span className="sidebar__nav-label">{item.label}</span>
+                    {badgeInfo && (
+                      <span
+                        className="sidebar__badge"
+                        style={{ background: badgeInfo.color }}
+                      >
+                        {badgeInfo.count}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           ))
         ) : (

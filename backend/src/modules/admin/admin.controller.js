@@ -10,6 +10,15 @@ export const getDashboard = catchAsync(async (_req, res) => {
   });
 });
 
+export const getBadgeCounts = catchAsync(async (_req, res) => {
+  const result = await adminService.getBadgeCounts();
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
 export const getOrders = catchAsync(async (req, res) => {
   const result = await adminService.getAllOrders(req.query);
 

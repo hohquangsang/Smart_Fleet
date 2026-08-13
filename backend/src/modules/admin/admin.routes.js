@@ -12,6 +12,7 @@ router.use(auth);
 router.use(authorize(ROLES.ADMIN));
 
 router.get('/dashboard', adminController.getDashboard);
+router.get('/badge-counts', adminController.getBadgeCounts);
 router.get('/orders', validate(ordersQuerySchema, 'query'), adminController.getOrders);
 router.get('/drivers', adminController.getDrivers);
 router.get('/drivers/pending', adminController.getPendingDrivers);

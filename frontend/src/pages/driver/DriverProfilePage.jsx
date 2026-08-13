@@ -519,7 +519,7 @@ const DriverProfilePage = () => {
             disabled={submittingAppeal}
             onClick={handleAppealSubmit}
           >
-            {submittingAppeal ? 'Đang gửi thông tin...' : 'Gửi Thông Tin & Khiếu Nại Cho Admin Xét Duyệt 🚀'}
+            {submittingAppeal ? 'Đang gửi thông tin...' : 'Gửi Thông Tin & Khiếu Nại Cho Admin Xét Duyệt'}
           </button>
         </div>
       )}
@@ -576,7 +576,7 @@ const DriverProfilePage = () => {
             disabled={submittingAppeal}
             onClick={handleAppealSubmit}
           >
-            {submittingAppeal ? 'Đang gửi thông tin...' : 'Gửi Thông Tin & Khiếu Nại Cho Admin 🚀'}
+            {submittingAppeal ? 'Đang gửi thông tin...' : 'Gửi Thông Tin & Khiếu Nại Cho Admin'}
           </button>
         </div>
       )}

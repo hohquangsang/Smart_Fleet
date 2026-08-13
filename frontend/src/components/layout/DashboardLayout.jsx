@@ -18,25 +18,26 @@ const DashboardLayout = ({ title = 'Dashboard' }) => {
     if (!socket) return;
 
     const handleDriverApproval = (data) => {
-      if (data.approvalStatus === 'BLOCKED') {
+      const status = data.approvalStatus || data.status;
+      if (status === 'BLOCKED') {
         toast.error(data.message || 'Tài khoản của bạn đã bị khóa bởi Admin.', 'Tài khoản bị khóa 🔒');
-        if (user && user.driver) {
+        if (user) {
           updateUser({
             ...user,
             driver: {
-              ...user.driver,
+              ...(user.driver || {}),
               approvalStatus: 'BLOCKED',
-              rejectionReason: data.rejectionReason || user.driver.rejectionReason,
+              rejectionReason: data.rejectionReason || user.driver?.rejectionReason,
             },
           });
         }
-      } else if (data.approvalStatus === 'APPROVED') {
-        toast.success('Tài khoản của bạn đã được Admin mở khóa!', 'Thành công 🎉');
-        if (user && user.driver) {
+      } else if (status === 'APPROVED') {
+        toast.success('Hồ sơ tài xế của bạn đã được Admin phê duyệt! 🎉', 'Thành công 🎉');
+        if (user) {
           updateUser({
             ...user,
             driver: {
-              ...user.driver,
+              ...(user.driver || {}),
               approvalStatus: 'APPROVED',
               rejectionReason: null,
               isAppealed: false,
@@ -70,10 +71,12 @@ const DashboardLayout = ({ title = 'Dashboard' }) => {
     };
 
     socket.on('driver:approval-updated', handleDriverApproval);
+    socket.on('role:status-updated', handleDriverApproval);
     socket.on('user:status-updated', handleUserStatusUpdated);
 
     return () => {
       socket.off('driver:approval-updated', handleDriverApproval);
+      socket.off('role:status-updated', handleDriverApproval);
       socket.off('user:status-updated', handleUserStatusUpdated);
     };
   }, [socket, user, updateUser, toast]);
