@@ -170,8 +170,8 @@ const UsersPage = () => {
           <thead>
             <tr>
               <th>Người dùng</th>
-              <th>Liên hệ (SĐT & Email)</th>
-              <th>Số đơn đã đặt</th>
+              <th>Liên hệ</th>
+              <th>Số đơn</th>
               <th>Tổng chi tiêu</th>
               <th>Trạng thái</th>
               <th>Ngày tham gia</th>
@@ -200,7 +200,19 @@ const UsersPage = () => {
                     </td>
                     <td>
                       <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{userObj.phone}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{userObj.email}</div>
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          color: 'var(--text-muted)',
+                          maxWidth: '180px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={userObj.email}
+                      >
+                        {userObj.email}
+                      </div>
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
@@ -209,7 +221,7 @@ const UsersPage = () => {
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                        {userObj.totalSpent.toLocaleString('vi-VN')} đ
+                        {Number(userObj.totalSpent || 0).toLocaleString('vi-VN')} ₫
                       </span>
                     </td>
                     <td>
@@ -361,7 +373,7 @@ const UsersPage = () => {
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TỔNG CHI TIÊU</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-blue)', marginTop: 2 }}>
-                    {selectedUser.totalSpent.toLocaleString('vi-VN')} đ
+                    {Number(selectedUser.totalSpent || 0).toLocaleString('vi-VN')} ₫
                   </div>
                 </div>
               </div>

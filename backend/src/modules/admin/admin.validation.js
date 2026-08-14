@@ -23,6 +23,10 @@ export const ordersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   status: z.enum([
+    'ALL',
+    'PROCESSING',
+    'IN_PROGRESS',
+    'EXPIRED',
     'PENDING',
     'DISPATCHING',
     'DRIVER_ACCEPTED',
@@ -30,8 +34,15 @@ export const ordersQuerySchema = z.object({
     'IN_TRANSIT',
     'PICKED_UP',
     'DELIVERED',
+    'COMPLETED',
     'CANCELLED',
     'EXPIRED_NO_DRIVER',
   ]).optional(),
   search: z.string().optional(),
+});
+
+export const deleteOrdersSchema = z.object({
+  orderIds: z
+    .array(z.string().uuid('ID đơn hàng không hợp lệ'))
+    .min(1, 'Vui lòng chọn ít nhất 1 đơn hàng để xóa'),
 });

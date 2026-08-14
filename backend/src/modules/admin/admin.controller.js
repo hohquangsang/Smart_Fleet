@@ -28,6 +28,17 @@ export const getOrders = catchAsync(async (req, res) => {
   });
 });
 
+export const deleteOrders = catchAsync(async (req, res) => {
+  const { orderIds } = req.body;
+  const result = await adminService.deleteOrders(orderIds);
+
+  res.status(200).json({
+    success: true,
+    message: `Đã xóa thành công ${result.count} đơn hàng`,
+    data: result,
+  });
+});
+
 export const getDrivers = catchAsync(async (req, res) => {
   const { approval } = req.query;
   const drivers = await adminService.getAllDrivers(

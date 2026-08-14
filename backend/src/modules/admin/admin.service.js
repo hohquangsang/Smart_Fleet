@@ -283,13 +283,34 @@ export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}
 
   if (search && search.trim()) {
     const term = search.trim();
-    where.OR = [
+    const cleanTerm = term.replace(/^#/, '');
+
+    let matchedOrderIds = [];
+    if (/^[0-9a-f-]{3,36}$/i.test(cleanTerm)) {
+      try {
+        const pattern = `%${cleanTerm}%`;
+        const matched = await prisma.$queryRaw`SELECT id FROM orders WHERE id::text ILIKE ${pattern}`;
+        matchedOrderIds = matched.map((r) => r.id);
+      } catch {
+        matchedOrderIds = [];
+      }
+    }
+
+    const orConditions = [
       { pickupAddress: { contains: term, mode: 'insensitive' } },
       { dropoffAddress: { contains: term, mode: 'insensitive' } },
-      { id: { contains: term, mode: 'insensitive' } },
       { customer: { fullName: { contains: term, mode: 'insensitive' } } },
       { customer: { phoneNumber: { contains: term, mode: 'insensitive' } } },
+      { customer: { email: { contains: term, mode: 'insensitive' } } },
+      { driver: { user: { fullName: { contains: term, mode: 'insensitive' } } } },
+      { driver: { user: { phoneNumber: { contains: term, mode: 'insensitive' } } } },
     ];
+
+    if (matchedOrderIds.length > 0) {
+      orConditions.push({ id: { in: matchedOrderIds } });
+    }
+
+    where.OR = orConditions;
   }
 
   const [orders, total, allCount, processingCount, deliveredCount, expiredCount] = await Promise.all([
@@ -333,6 +354,21 @@ export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}
       expired: expiredCount,
     },
   };
+};
+
+/**
+ * Delete multiple orders by IDs.
+ */
+export const deleteOrders = async (orderIds = []) => {
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    throw new BadRequestError('Vui lòng chọn ít nhất 1 đơn hàng để xóa');
+  }
+
+  const deleteResult = await prisma.order.deleteMany({
+    where: { id: { in: orderIds } },
+  });
+
+  return { count: deleteResult.count };
 };
 
 /**

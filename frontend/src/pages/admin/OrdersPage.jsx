@@ -7,6 +7,8 @@ import {
   HiOutlineX,
   HiOutlineLightningBolt,
   HiOutlineCheckCircle,
+  HiOutlineTrash,
+  HiOutlineExclamation,
 } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
@@ -91,9 +93,14 @@ const AdminOrdersPage = () => {
   const [processing, setProcessing] = useState(null); // orderId đang xử lý
   const [selectedOrder, setSelectedOrder] = useState(null); // modal chi tiết
 
+  // Selected orders for deletion
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [ordersToDelete, setOrdersToDelete] = useState([]); // array of order IDs targeted for deletion
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // ─── Fetch danh sách đơn từ API ────────────────────────────
   const fetchOrders = useCallback(
-    async (targetPage = page) => {
+    async (targetPage = page, querySearch = searchTerm) => {
       setLoading(true);
       try {
         const params = {
@@ -101,7 +108,7 @@ const AdminOrdersPage = () => {
           limit: 10,
         };
         if (statusFilter !== 'ALL') params.status = statusFilter;
-        if (searchTerm.trim()) params.search = searchTerm.trim();
+        if (querySearch && querySearch.trim()) params.search = querySearch.trim();
 
         const { data } = await api.get('/admin/orders', { params });
 
@@ -122,22 +129,94 @@ const AdminOrdersPage = () => {
     [page, statusFilter, searchTerm, toast]
   );
 
+  // Debounced search & refetch khi page, statusFilter, hoặc searchTerm thay đổi
   useEffect(() => {
-    fetchOrders(page);
-  }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    const timer = setTimeout(() => {
+      fetchOrders(page, searchTerm);
+    }, 400);
 
-  // Khi tìm kiếm, reset về trang 1
+    return () => clearTimeout(timer);
+  }, [page, statusFilter, searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Khi tìm kiếm bằng phím Enter, reset về trang 1
   const handleSearchSubmit = (e) => {
     if (e.key === 'Enter') {
       setPage(1);
-      fetchOrders(1);
+      fetchOrders(1, searchTerm);
     }
+  };
+
+  // Nút xóa từ khóa tìm kiếm
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setPage(1);
+    fetchOrders(1, '');
   };
 
   // Switch filter tab
   const handleTabChange = (newStatus) => {
     setStatusFilter(newStatus);
     setPage(1);
+  };
+
+  // ─── Selection Handlers cho Xóa Hàng Loạt ─────────────────
+  const currentPageIds = orders.map((o) => o.id);
+  const isAllSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedOrderIds.includes(id));
+  const isSomeSelected =
+    currentPageIds.some((id) => selectedOrderIds.includes(id)) && !isAllSelected;
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedOrderIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+    } else {
+      const combined = new Set([...selectedOrderIds, ...currentPageIds]);
+      setSelectedOrderIds(Array.from(combined));
+    }
+  };
+
+  const handleToggleSelectOrder = (e, orderId) => {
+    e.stopPropagation();
+    setSelectedOrderIds((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const handleClearSelection = () => {
+    setSelectedOrderIds([]);
+  };
+
+  const handleOpenDeleteModal = (targetIds) => {
+    if (!targetIds || targetIds.length === 0) return;
+    setOrdersToDelete(targetIds);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (ordersToDelete.length === 0) return;
+    setIsDeleting(true);
+    try {
+      const { data } = await api.delete('/admin/orders', {
+        data: { orderIds: ordersToDelete },
+      });
+      toast.success(
+        data.message || `Đã xóa ${ordersToDelete.length} đơn hàng thành công!`,
+        'Xóa đơn hàng'
+      );
+      // Remove deleted IDs from selection
+      setSelectedOrderIds((prev) => prev.filter((id) => !ordersToDelete.includes(id)));
+      // Close detail modal if the open order was deleted
+      if (selectedOrder && ordersToDelete.includes(selectedOrder.id)) {
+        setSelectedOrder(null);
+      }
+      setOrdersToDelete([]);
+      fetchOrders(page, searchTerm);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Lỗi khi xóa đơn hàng';
+      toast.error(msg, 'Thất bại');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // ─── Socket: nhận đơn mới & cập nhật trạng thái real-time ──
@@ -235,16 +314,38 @@ const AdminOrdersPage = () => {
       </div>
 
       {/* Search Input */}
-      <div className="orders-search-wrapper">
+      <div className="orders-search-wrapper" style={{ position: 'relative' }}>
         <HiOutlineSearch className="orders-search-icon" />
         <input
           type="text"
           className="orders-search-input"
-          placeholder="Tìm địa chỉ, khách hàng..."
+          placeholder="Tìm địa chỉ, khách hàng, tài xế, mã đơn (#)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleSearchSubmit}
         />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={handleClearSearch}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '4px',
+            }}
+            title="Xóa tìm kiếm"
+          >
+            <HiOutlineX style={{ fontSize: '1.1rem' }} />
+          </button>
+        )}
       </div>
 
       {/* Status Filter Tabs */}
@@ -279,6 +380,32 @@ const AdminOrdersPage = () => {
         </button>
       </div>
 
+      {/* Floating Bulk Action Bar */}
+      {selectedOrderIds.length > 0 && (
+        <div className="orders-bulk-action-bar">
+          <div className="bulk-action-info">
+            <span className="bulk-action-badge">{selectedOrderIds.length}</span>
+            <span>Đơn hàng đã được chọn</span>
+          </div>
+          <div className="bulk-action-buttons">
+            <button
+              type="button"
+              className="bulk-action-btn bulk-action-btn--cancel"
+              onClick={handleClearSelection}
+            >
+              Hủy chọn
+            </button>
+            <button
+              type="button"
+              className="bulk-action-btn bulk-action-btn--delete"
+              onClick={() => handleOpenDeleteModal(selectedOrderIds)}
+            >
+              <HiOutlineTrash style={{ fontSize: '1.1rem' }} /> Xóa {selectedOrderIds.length} đơn hàng
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Orders Table Container */}
       <div className="orders-table-card">
         {loading ? (
@@ -294,6 +421,17 @@ const AdminOrdersPage = () => {
             <table className="orders-table">
               <thead>
                 <tr>
+                  <th style={{ width: 44, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      className="orders-checkbox"
+                      checked={isAllSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isSomeSelected;
+                      }}
+                      onChange={handleSelectAll}
+                    />
+                  </th>
                   <th>TRẠNG THÁI</th>
                   <th>KHÁCH HÀNG</th>
                   <th>TUYẾN ĐƯỜNG</th>
@@ -309,13 +447,24 @@ const AdminOrdersPage = () => {
                     order.customer?.fullName || order.customerName || 'Khách hàng';
                   const initials = getInitials(customerName);
                   const orderCode = `#${order.id?.slice(-8).toUpperCase() || '—'}`;
+                  const isSelected = selectedOrderIds.includes(order.id);
 
                   return (
                     <tr
                       key={order.id}
-                      className="orders-table-row"
+                      className={`orders-table-row ${isSelected ? 'orders-table-row--selected' : ''}`}
                       onClick={() => setSelectedOrder(order)}
                     >
+                      {/* CHECKBOX */}
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="orders-checkbox"
+                          checked={isSelected}
+                          onChange={(e) => handleToggleSelectOrder(e, order.id)}
+                        />
+                      </td>
+
                       {/* TRẠNG THÁI */}
                       <td>
                         <span className={`status-pill ${statusInfo.className}`}>
@@ -381,9 +530,27 @@ const AdminOrdersPage = () => {
                         </span>
                       </td>
 
-                      {/* ACTION / CHEVRON */}
-                      <td style={{ textAlign: 'right' }}>
-                        <HiChevronRight className="chevron-icon" />
+                      {/* ACTION / CHEVRON & DELETE */}
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="orders-row-action-btn orders-row-action-btn--delete"
+                          title="Xóa đơn hàng này"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDeleteModal([order.id]);
+                          }}
+                        >
+                          <HiOutlineTrash />
+                        </button>
+                        <button
+                          type="button"
+                          className="orders-row-action-btn"
+                          title="Xem chi tiết"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <HiChevronRight />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -706,6 +873,27 @@ const AdminOrdersPage = () => {
 
               <button
                 type="button"
+                onClick={() => handleOpenDeleteModal([selectedOrder.id])}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                title="Xóa đơn hàng này"
+              >
+                <HiOutlineTrash />
+                Xóa đơn
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setSelectedOrder(null)}
                 style={{
                   flex: selectedOrder.status === 'PENDING' || selectedOrder.status === 'DRIVER_ACCEPTED' ? 0.5 : 1,
@@ -713,12 +901,69 @@ const AdminOrdersPage = () => {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 8,
-                  padding: '10px',
+                  padding: '10px 14px',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa đơn hàng (đơn lẻ hoặc hàng loạt) */}
+      {ordersToDelete.length > 0 && (
+        <div className="modal-overlay" onClick={() => !isDeleting && setOrdersToDelete([])}>
+          <div className="delete-modal-box" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="delete-modal-close"
+              disabled={isDeleting}
+              onClick={() => setOrdersToDelete([])}
+              title="Đóng"
+            >
+              <HiOutlineX />
+            </button>
+
+            <div className="delete-modal-icon-wrapper">
+              <HiOutlineTrash />
+            </div>
+
+            <h3 className="delete-modal-title">Xác nhận xóa đơn hàng</h3>
+            <p className="delete-modal-desc">
+              {ordersToDelete.length === 1 ? (
+                <>
+                  Bạn có chắc chắn muốn xóa đơn hàng <strong>#{ordersToDelete[0].slice(-8).toUpperCase()}</strong> không?
+                  <br />
+                  Dữ liệu bị xóa sẽ không thể phục hồi.
+                </>
+              ) : (
+                <>
+                  Bạn có chắc chắn muốn xóa <strong>{ordersToDelete.length} đơn hàng</strong> đã chọn không?
+                  <br />
+                  Dữ liệu bị xóa sẽ không thể phục hồi.
+                </>
+              )}
+            </p>
+
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-btn-cancel"
+                disabled={isDeleting}
+                onClick={() => setOrdersToDelete([])}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className="delete-btn-confirm"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+              >
+                {isDeleting ? 'Đang xóa...' : `Xác nhận xóa (${ordersToDelete.length})`}
               </button>
             </div>
           </div>
