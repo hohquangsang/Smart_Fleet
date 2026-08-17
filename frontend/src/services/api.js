@@ -47,3 +47,17 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// ─── Forgot Password API helpers ──────────────────────────────────
+
+/** Bước 1: Gửi OTP về email */
+export const forgotPasswordApi = (email) =>
+  api.post('/auth/forgot-password', { email });
+
+/** Bước 2: Xác minh OTP, nhận reset token */
+export const verifyOtpApi = (email, otp) =>
+  api.post('/auth/verify-otp', { email, otp });
+
+/** Bước 3: Đặt mật khẩu mới */
+export const resetPasswordApi = (email, resetToken, newPassword, confirmPassword) =>
+  api.post('/auth/reset-password', { email, resetToken, newPassword, confirmPassword });

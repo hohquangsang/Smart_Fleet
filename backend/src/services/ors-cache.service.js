@@ -38,7 +38,7 @@ export const getRouteWithCache = async (pickupLat, pickupLng, dropoffLat, dropof
     await redis.set(cacheKey, JSON.stringify(route), 'EX', env.ROUTE_CACHE_TTL_SEC);
     return { ...route, cached: false };
   } catch (err) {
-    console.warn(`⚠️ ORS API error, using Haversine fallback: ${err.message}`);
+    console.warn(`ORS API error, using Haversine fallback: ${err.message}`);
     const R = 6371;
     const dLat = ((dropoffLat - pickupLat) * Math.PI) / 180;
     const dLon = ((dropoffLng - pickupLng) * Math.PI) / 180;

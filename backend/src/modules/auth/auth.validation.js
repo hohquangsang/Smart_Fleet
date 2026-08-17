@@ -33,3 +33,38 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token không được để trống'),
 });
 
+// ─── Forgot Password Schemas ────────────────────────────────────────────────
+
+/**
+ * Step 1: Gửi OTP – chỉ cần email
+ */
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Email không đúng định dạng'),
+});
+
+/**
+ * Step 2: Xác minh OTP
+ */
+export const verifyOtpSchema = z.object({
+  email: z.string().email('Email không đúng định dạng'),
+  otp: z
+    .string()
+    .length(6, 'OTP phải đúng 6 chữ số')
+    .regex(/^\d{6}$/, 'OTP chỉ được chứa chữ số'),
+});
+
+/**
+ * Step 3: Đặt lại mật khẩu mới
+ */
+export const resetPasswordSchema = z.object({
+  email: z.string().email('Email không đúng định dạng'),
+  resetToken: z.string().min(1, 'Reset token không được để trống'),
+  newPassword: z
+    .string()
+    .min(6, 'Mật khẩu mới phải từ 6 ký tự trở lên')
+    .max(128, 'Mật khẩu tối đa 128 ký tự'),
+  confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Mật khẩu xác nhận không khớp',
+  path: ['confirmPassword'],
+});

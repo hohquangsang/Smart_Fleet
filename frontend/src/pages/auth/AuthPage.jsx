@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import useToast from '../../hooks/useToast';
 import DispatchMap from '../../components/auth/DispatchMap';
@@ -270,6 +270,25 @@ const AuthPage = () => {
                   required
                   autoComplete="current-password"
                 />
+              </div>
+
+              {/* Forgot password link */}
+              <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+                <Link
+                  to="/forgot-password"
+                  id="link-forgot-password"
+                  style={{
+                    fontSize: '0.82rem',
+                    color: 'var(--auth-text-sub)',
+                    textDecoration: 'none',
+                    fontFamily: 'var(--font-body)',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseOver={(e) => (e.target.style.color = 'var(--auth-blue)')}
+                  onMouseOut={(e) => (e.target.style.color = 'var(--auth-text-sub)')}
+                >
+                  Quên mật khẩu?
+                </Link>
               </div>
 
               <button

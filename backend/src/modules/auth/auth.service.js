@@ -2,10 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../../config/database.js';
 import env from '../../config/env.js';
-import { UnauthorizedError, ConflictError, BadRequestError } from '../../utils/api-error.js';
+import { UnauthorizedError, ConflictError, BadRequestError, NotFoundError } from '../../utils/api-error.js';
 import { ROLES, APPROVAL_STATUS } from '../../utils/constants.js';
-
 import { emitAdminNewDriverRegistered } from '../../sockets/socket.gateway.js';
+import { generateAndStoreOtp, verifyOtp, issueResetToken, verifyAndConsumeResetToken, getResendCooldown } from '../../services/otp.service.js';
+import { sendOtpEmail } from '../../services/email.service.js';
 
 /**
  * Generate JWT access + refresh token pair.
@@ -218,4 +219,89 @@ export const refreshAccessToken = async (refreshToken) => {
     }
     throw error;
   }
+};
+
+// ─── Forgot Password (3 bước) ─────────────────────────────────────────────
+
+/**
+ * Bước 1: Kiểm tra email tồn tại, tạo OTP và gửi qua nodemailer.
+ *
+ * @param {string} email
+ */
+export const sendForgotPasswordOtp = async (email) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  // Luôn trả về thành công để tránh email enumeration attack
+  if (!user) {
+    return { message: 'Nếu email tồn tại, OTP sẽ được gửi đến hộp thư của bạn.' };
+  }
+
+  // Kiểm tra cooldown: chắn gửi lại quá nhanh (< 60 giây giữa các lần)
+  const cooldownSeconds = await getResendCooldown(email);
+  if (cooldownSeconds > 0) {
+    throw new BadRequestError(
+      `Vui lòng chờ ${cooldownSeconds} giây trước khi gửi lại OTP.`,
+      { cooldownSeconds }
+    );
+  }
+
+  const otp = await generateAndStoreOtp(email);
+
+  // Await gửi email — để lỗi thật sự được trả về client thay vì âm thầm
+  try {
+    await sendOtpEmail(email, user.fullName, otp);
+  } catch (emailErr) {
+    console.error('[ForgotPassword] Gửi email thất bại:', emailErr.message);
+    throw new BadRequestError('Không thể gửi email OTP. Vui lòng kiểm tra địa chỉ email hoặc thử lại sau.');
+  }
+
+  return { message: 'OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.' };
+};
+
+/**
+ * Bước 2: Xác minh OTP người dùng nhập – trả về reset token nếu đúng.
+ *
+ * @param {string} email
+ * @param {string} otp
+ * @returns {{ resetToken: string }}
+ */
+export const verifyForgotPasswordOtp = async (email, otp) => {
+  const result = await verifyOtp(email, otp);
+
+  if (!result.valid) {
+    throw new BadRequestError(result.reason);
+  }
+
+  // OTP hợp lệ → phát hành reset token dùng một lần (hết hạn 15 phút)
+  const resetToken = await issueResetToken(email);
+
+  return { resetToken, message: 'OTP hợp lệ. Hãy đặt mật khẩu mới trong 15 phút.' };
+};
+
+/**
+ * Bước 3: Xác minh reset token và cập nhật mật khẩu mới.
+ *
+ * @param {string} email
+ * @param {string} resetToken
+ * @param {string} newPassword
+ */
+export const resetPassword = async (email, resetToken, newPassword) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new NotFoundError('Không tìm thấy tài khoản với email này');
+  }
+
+  const isTokenValid = await verifyAndConsumeResetToken(email, resetToken);
+  if (!isTokenValid) {
+    throw new BadRequestError('Reset token không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại từ bước 1.');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  await prisma.user.update({
+    where: { email },
+    data: { passwordHash },
+  });
+
+  return { message: 'Mật khẩu đã được cập nhật thành công. Vui lòng đăng nhập lại.' };
 };

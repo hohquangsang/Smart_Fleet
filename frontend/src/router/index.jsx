@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AuthPage from '../pages/auth/AuthPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import DriversPage from '../pages/admin/DriversPage';
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <AuthPage /> },
   { path: '/register', element: <AuthPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
 
   // Admin Routes
   {
