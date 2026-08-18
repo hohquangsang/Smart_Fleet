@@ -152,7 +152,7 @@ const UsersPage = () => {
           </button>
         </div>
 
-        <div className="topbar__search" style={{ width: 280 }}>
+        <div className="topbar__search" style={{ width: 300 }}>
           <HiOutlineSearch className="topbar__search-icon" />
           <input
             type="text"

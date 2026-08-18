@@ -4,6 +4,7 @@ import userRoutes from '../modules/user/user.routes.js';
 import driverRoutes from '../modules/driver/driver.routes.js';
 import orderRoutes from '../modules/order/order.routes.js';
 import adminRoutes from '../modules/admin/admin.routes.js';
+import settingsRoutes from '../modules/settings/settings.routes.js';
 import invoiceRoutes from '../modules/invoice/invoice.routes.js';
 import mapRoutes from '../modules/map/map.routes.js';
 
@@ -15,6 +16,7 @@ router.use('/user', userRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/orders', orderRoutes);
 router.use('/admin', adminRoutes);
+router.use('/admin/settings', settingsRoutes);
 router.use('/invoices', invoiceRoutes);
 router.use('/maps', mapRoutes);
 

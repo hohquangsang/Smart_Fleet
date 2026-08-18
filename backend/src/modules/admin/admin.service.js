@@ -442,29 +442,39 @@ export const getAllUsers = async () => {
     orderBy: { createdAt: 'desc' },
   });
 
-  return users.map((u) => {
-    const totalSpent = u.customerOrders.reduce((sum, o) => sum + (o.totalFare || 0), 0);
-    return {
-      id: u.id,
-      name: u.fullName || 'Khách hàng',
-      email: u.email,
-      phone: u.phoneNumber || '—',
-      ordersCount: u._count.customerOrders,
-      totalSpent,
-      isBlocked: Boolean(u.isBlocked),
-      blockReason: u.blockReason || null,
-      appealNote: u.appealNote || null,
-      isAppealed: Boolean(u.isAppealed),
-      status: u.isBlocked ? 'BLOCKED' : 'ACTIVE',
-      createdAt: new Date(u.createdAt).toLocaleDateString('vi-VN'),
-      recentOrders: u.customerOrders.map((o) => ({
-        code: `#ORD-${o.id.slice(-8).toUpperCase()}`,
-        status: o.status,
-        fare: `${Number(o.totalFare || 0).toLocaleString('vi-VN')} đ`,
-      })),
-    };
-  });
+  // Tính tổng chi tiêu chính xác cho toàn bộ đơn (không chỉ 5 đơn gần nhất)
+  const spentMap = await Promise.all(
+    users.map(async (u) => {
+      const agg = await prisma.order.aggregate({
+        _sum: { totalFare: true },
+        where: { customerId: u.id },
+      });
+      return { id: u.id, totalSpent: Number(agg._sum.totalFare || 0) };
+    })
+  );
+  const spentById = Object.fromEntries(spentMap.map((s) => [s.id, s.totalSpent]));
+
+  return users.map((u) => ({
+    id: u.id,
+    name: u.fullName || 'Khách hàng',
+    email: u.email,
+    phone: u.phoneNumber || '—',
+    ordersCount: u._count.customerOrders,
+    totalSpent: spentById[u.id] ?? 0,
+    isBlocked: Boolean(u.isBlocked),
+    blockReason: u.blockReason || null,
+    appealNote: u.appealNote || null,
+    isAppealed: Boolean(u.isAppealed),
+    status: u.isBlocked ? 'BLOCKED' : 'ACTIVE',
+    createdAt: new Date(u.createdAt).toLocaleDateString('vi-VN'),
+    recentOrders: u.customerOrders.map((o) => ({
+      code: `#ORD-${o.id.slice(-8).toUpperCase()}`,
+      status: o.status,
+      fare: `${Number(o.totalFare || 0).toLocaleString('vi-VN')} đ`,
+    })),
+  }));
 };
+
 
 import { unregisterOnlineDriver } from '../order/dispatch.service.js';
 

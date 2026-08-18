@@ -27,9 +27,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
-  driver         Driver?   @relation("UserDriver")
-  customerOrders Order[]   @relation("CustomerOrders")
-  approvedDrivers Driver[] @relation("ApprovedByAdmin")
+  driver         Driver?    @relation("UserDriver")
+  customerOrders Order[]    @relation("CustomerOrders")
+  approvedDrivers Driver[]  @relation("ApprovedByAdmin")
+  auditLogs      AuditLog[] @relation("AdminAuditLogs")
 
   @@map("users")
 }
@@ -178,6 +179,39 @@ model DriverLocationHistory {
 
   @@index([driverId, createdAt(sort: Desc)], name: "idx_driver_loc_history")
   @@map("driver_locations_history")
+}
+
+// ─── System Config ──────────────────────────────────────
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique @db.VarChar(100)
+  value     String
+  label     String?  @db.VarChar(200)
+  group     String?  @db.VarChar(50)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([group], name: "idx_system_config_group")
+  @@map("system_configs")
+}
+
+// ─── Audit Log ───────────────────────────────────────────
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String?  @map("target_type") @db.VarChar(50)
+  targetId   String?  @map("target_id") @db.VarChar(255)
+  detail     Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  admin User @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId], name: "idx_audit_log_admin")
+  @@index([createdAt(sort: Desc)], name: "idx_audit_log_created")
+  @@map("audit_logs")
 }
 
 // ─── Invoices ────────────────────────────────────────────

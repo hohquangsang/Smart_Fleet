@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout, HiOutlineUser } from 'react-icons/hi';
+import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout, HiOutlineUser, HiOutlineCog } from 'react-icons/hi';
 import useAdminNotifications from '../../hooks/useAdminNotifications';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/sidebar.css';
@@ -49,6 +49,12 @@ const Sidebar = () => {
         { path: '/admin/orders', label: 'Đơn hàng', icon: <HiOutlineShoppingCart /> },
         { path: '/admin/drivers', label: 'Tài xế', icon: <HiOutlineUsers /> },
         { path: '/admin/users', label: 'Người dùng', icon: <HiOutlineUserGroup /> },
+      ],
+    },
+    {
+      groupTitle: 'HỆ THỐNG',
+      items: [
+        { path: '/admin/settings', label: 'Cài đặt', icon: <HiOutlineCog /> },
       ],
     },
   ];
@@ -133,7 +139,7 @@ const Sidebar = () => {
       <div className="sidebar__footer">
         <div className="sidebar__user" style={{ cursor: 'default' }}>
           <NavLink
-            to={isDriver ? '/driver/profile' : isAdmin ? '/admin/users' : '/customer/profile'}
+            to={isDriver ? '/driver/profile' : isAdmin ? '/admin/settings' : '/customer/profile'}
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', color: 'inherit' }}
             title="Cập nhật thông tin cá nhân"
           >

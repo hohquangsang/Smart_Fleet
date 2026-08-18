@@ -231,9 +231,8 @@ export const refreshAccessToken = async (refreshToken) => {
 export const sendForgotPasswordOtp = async (email) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // Luôn trả về thành công để tránh email enumeration attack
   if (!user) {
-    return { message: 'Nếu email tồn tại, OTP sẽ được gửi đến hộp thư của bạn.' };
+    throw new NotFoundError('Email này không tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
   }
 
   // Kiểm tra cooldown: chắn gửi lại quá nhanh (< 60 giây giữa các lần)

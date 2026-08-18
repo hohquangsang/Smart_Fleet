@@ -6,6 +6,7 @@ import DashboardPage from '../pages/admin/DashboardPage';
 import DriversPage from '../pages/admin/DriversPage';
 import UsersPage from '../pages/admin/UsersPage';
 import AdminOrdersPage from '../pages/admin/OrdersPage';
+import SettingsPage from '../pages/admin/SettingsPage';
 import CreateOrderPage from '../pages/customer/CreateOrderPage';
 import CustomerTrackingPage from '../pages/customer/CustomerTrackingPage';
 import CustomerHistoryPage from '../pages/customer/CustomerHistoryPage';
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: 'orders', element: <AdminOrdersPage /> },
       { path: 'drivers', element: <DriversPage /> },
       { path: 'users', element: <UsersPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/admin" replace /> },
     ],
   },

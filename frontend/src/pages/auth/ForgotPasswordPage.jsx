@@ -211,8 +211,17 @@ const ForgotPasswordPage = () => {
       toast.success('Mã OTP đã được gửi!', 'Kiểm tra hộp thư');
       resetTimer(); go(2);
     } catch (err) {
+      const status = err.response?.status;
       const msg = parseApiError(err, 'Không thể gửi OTP. Thử lại sau.');
-      setError(msg);
+
+      if (status === 404) {
+        // Email không tồn tại → hiển thị toast lỗi và ở lại Step 1
+        toast.error('Vui lòng kiểm tra lại địa chỉ email', 'Email không tồn tại');
+        setError(msg);
+      } else {
+        setError(msg);
+      }
+      // Không chuyển sang Step 2 – người dùng nhập lại tại chỗ
     } finally { setLoading(false); }
   };
 
