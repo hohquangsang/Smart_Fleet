@@ -98,6 +98,16 @@ export const changeAdminPassword = async (adminId, { currentPassword, newPasswor
   return { message: 'Đổi mật khẩu thành công' };
 };
 
+export const updateAdminAvatar = async (adminId, avatarBase64) => {
+  const user = await prisma.user.update({
+    where: { id: adminId },
+    data: { avatar: avatarBase64 },
+    select: { id: true, fullName: true, email: true, avatar: true },
+  });
+  await createAuditLog(adminId, 'UPDATE_AVATAR', 'USER', adminId);
+  return user;
+};
+
 // ─── System Config ──────────────────────────────────────────────────────────
 export const getSystemConfig = async () => {
   // Try Redis cache first

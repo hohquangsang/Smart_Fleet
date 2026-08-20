@@ -19,6 +19,19 @@ export const changePassword = catchAsync(async (req, res) => {
   res.status(200).json({ success: true, ...result });
 });
 
+export const uploadAvatar = catchAsync(async (req, res) => {
+  const { avatarBase64 } = req.body;
+  if (!avatarBase64 || !avatarBase64.startsWith('data:image/')) {
+    return res.status(400).json({ success: false, error: { message: 'Dữ liệu ảnh không hợp lệ' } });
+  }
+  // Limit size: base64 of 5MB image ≈ 6.67MB string
+  if (avatarBase64.length > 7 * 1024 * 1024) {
+    return res.status(400).json({ success: false, error: { message: 'Ảnh vượt quá 5 MB' } });
+  }
+  const profile = await settingsService.updateAdminAvatar(req.user.id, avatarBase64);
+  res.status(200).json({ success: true, data: { avatarUrl: profile.avatar, profile } });
+});
+
 // ─── System Config ──────────────────────────────────────────────────────────
 export const getConfig = catchAsync(async (_req, res) => {
   const config = await settingsService.getSystemConfig();

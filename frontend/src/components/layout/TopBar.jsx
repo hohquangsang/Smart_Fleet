@@ -67,8 +67,14 @@ const TopBar = ({ title }) => {
               {user?.role}
             </div>
           </div>
-          <div className="sidebar__avatar" style={{ boxShadow: '0 0 10px rgba(59, 130, 246, 0.3)' }}>
-            {initials}
+          <div
+            className="sidebar__avatar"
+            style={{ boxShadow: '0 0 10px rgba(59, 130, 246, 0.3)', overflow: 'hidden', padding: 0 }}
+          >
+            {user?.avatarUrl || user?.avatar
+              ? <img src={user.avatarUrl || user.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : initials
+            }
           </div>
         </div>
       </div>

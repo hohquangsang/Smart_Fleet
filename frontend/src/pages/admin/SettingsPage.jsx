@@ -107,15 +107,6 @@ const SettingsPage = () => {
 
       {/* ── Main Content ── */}
       <div className="settings-content">
-        {/* Page Header */}
-        <div className="settings-header">
-          <div className="settings-header__icon">{current?.icon}</div>
-          <div>
-            <h1 className="settings-header__title">{current?.label}</h1>
-            <p className="settings-header__subtitle">{current?.desc}</p>
-          </div>
-        </div>
-
         {/* Tab Content */}
         {ActiveComponent && <ActiveComponent />}
       </div>

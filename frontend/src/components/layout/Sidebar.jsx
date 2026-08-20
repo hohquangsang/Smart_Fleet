@@ -143,7 +143,12 @@ const Sidebar = () => {
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', color: 'inherit' }}
             title="Cập nhật thông tin cá nhân"
           >
-            <div className="sidebar__avatar">{initials}</div>
+            <div className="sidebar__avatar" style={{ overflow: 'hidden', padding: 0 }}>
+              {user?.avatarUrl || user?.avatar
+                ? <img src={user.avatarUrl || user.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : initials
+              }
+            </div>
             <div className="sidebar__user-info">
               <div className="sidebar__user-name">{user?.fullName}</div>
               <div className="sidebar__user-role">{user?.role}</div>

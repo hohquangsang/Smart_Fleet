@@ -7,6 +7,16 @@ export const settingsApi = {
   getProfile:      () => api.get(`${BASE}/profile`),
   updateProfile:   (data) => api.patch(`${BASE}/profile`, data),
   changePassword:  (data) => api.patch(`${BASE}/profile/password`, data),
+  uploadAvatar:    (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      api.post(`${BASE}/profile/avatar`, { avatarBase64: reader.result })
+        .then(resolve)
+        .catch(reject);
+    };
+    reader.onerror = () => reject(new Error('Không thể đọc file ảnh'));
+    reader.readAsDataURL(file);
+  }),
 
   // System Config
   getConfig:       () => api.get(`${BASE}/config`),

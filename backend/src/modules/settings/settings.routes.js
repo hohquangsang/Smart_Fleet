@@ -14,6 +14,7 @@ router.use(authorize(ROLES.ADMIN));
 router.get('/profile', settingsController.getProfile);
 router.patch('/profile', settingsController.updateProfile);
 router.patch('/profile/password', settingsController.changePassword);
+router.post('/profile/avatar', settingsController.uploadAvatar);
 
 // ── System Config ─────────────────────────────────────────
 router.get('/config', settingsController.getConfig);

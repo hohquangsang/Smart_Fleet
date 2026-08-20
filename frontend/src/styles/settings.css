@@ -246,56 +246,113 @@
   color: var(--text-muted);
 }
 
-/* ── Avatar Upload ───────────────────────────────────────── */
-.settings-avatar-row {
+/* ── Profile Hero ────────────────────────────────────────── */
+.profile-hero {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
-.settings-avatar {
-  width: 80px;
-  height: 80px;
+.profile-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
-  background: var(--bg-panel-floating);
-  border: 2px solid var(--border-primary);
+  background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(6,182,212,0.2));
+  border: 2.5px solid rgba(59,130,246,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
-  flex-shrink: 0;
   overflow: hidden;
   position: relative;
+  box-shadow: 0 0 18px rgba(59,130,246,0.18);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.settings-avatar img {
+.profile-avatar:hover {
+  border-color: rgba(59,130,246,0.6);
+  box-shadow: 0 0 26px rgba(59,130,246,0.28);
+}
+
+.profile-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.settings-avatar__info {
+.profile-avatar__uploading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  border-radius: 50%;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: center;
 }
 
-.settings-avatar__name {
-  font-size: 1rem;
+.profile-avatar__camera {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  border: 2px solid var(--bg-secondary);
+  color: #fff;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.profile-avatar__camera:hover:not(:disabled) {
+  transform: scale(1.12);
+  background: var(--accent-cyan);
+}
+
+.profile-avatar__camera:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-identity__name {
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.settings-avatar__role {
-  font-size: 0.78rem;
+.profile-identity__email {
+  font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* ── Avatar role badge (re-used) ─────────────────────────── */
+.settings-avatar__role {
+  font-size: 0.72rem;
   background: rgba(59,130,246,0.12);
   color: var(--accent-blue);
   padding: 2px 8px;
   border-radius: 4px;
   display: inline-block;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
