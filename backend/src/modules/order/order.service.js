@@ -5,6 +5,7 @@ import { predictETA } from '../../services/ai.service.js';
 import { calculateFare } from '../../utils/fare-calculator.js';
 import { NotFoundError, BadRequestError, ForbiddenError, ConflictError } from '../../utils/api-error.js';
 import { ORDER_STATUS, ACTOR_TYPE, REDIS_KEYS, DRIVER_STATUS } from '../../utils/constants.js';
+import { createAuditLog } from '../settings/settings.service.js';
 import { transitionOrderStatus } from './order-status.service.js';
 import {
   getOnlineDriverIds,
@@ -138,6 +139,10 @@ export const dispatchOrder = async (orderId, adminUserId) => {
 
   // Set Redis key order:{id}:dispatch_deadline with TTL 30s
   await setDispatchDeadline(order.id, 30);
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'DISPATCH_ORDER', 'ORDER', orderId);
+  }
 
   return updatedOrder;
 };
@@ -276,6 +281,10 @@ export const confirmMatchOrder = async (orderId, adminUserId) => {
       order: updatedOrder,
       message: 'Admin đã xác nhận! Hãy đi đến lấy hàng và nhấn "Bắt đầu giao" khi xuất phát.',
     });
+  }
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'CONFIRM_MATCH', 'ORDER', orderId);
   }
 
   return updatedOrder;
@@ -581,6 +590,10 @@ export const cancelOrder = async (orderId, actorUserId, actorType = ACTOR_TYPE.C
     status: ORDER_STATUS.CANCELLED,
     label: 'Đã hủy đơn hàng',
   });
+
+  if (actorType === ACTOR_TYPE.ADMIN && actorUserId) {
+    await createAuditLog(actorUserId, 'CANCEL_ORDER', 'ORDER', orderId, { cancelReason });
+  }
 
   return updatedOrder;
 };

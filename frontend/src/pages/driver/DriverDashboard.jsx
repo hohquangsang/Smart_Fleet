@@ -55,6 +55,28 @@ const RecenterMap = ({ coords }) => {
   return null;
 };
 
+const getSavedGpsCoords = () => {
+  try {
+    const saved = localStorage.getItem('driver_gps_coords');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 2 && !isNaN(parsed[0]) && !isNaN(parsed[1])) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading saved GPS coords:', e);
+  }
+  return [10.7769, 106.7009];
+};
+
+const getSavedGpsStatus = () => {
+  const savedStatus = localStorage.getItem('driver_gps_status');
+  if (savedStatus) return savedStatus;
+  const hasSaved = localStorage.getItem('driver_gps_coords');
+  return hasSaved ? 'Vị trí GPS đã lưu' : 'Chưa cập nhật GPS (Nhấn "Cập Nhật GPS")';
+};
+
 const DriverDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -66,9 +88,9 @@ const DriverDashboard = () => {
   const isApproved = approvalStatus === 'APPROVED';
   const [isOnline, setIsOnline] = useState(false);
 
-  // Live GPS Coords state
-  const [coords, setCoords] = useState([10.7769, 106.7009]);
-  const [gpsStatus, setGpsStatus] = useState('Đang kết nối GPS...');
+  // Live GPS Coords state (persisted across page navigation, no auto-fetch on login)
+  const [coords, setCoords] = useState(getSavedGpsCoords);
+  const [gpsStatus, setGpsStatus] = useState(getSavedGpsStatus);
 
   const [quickStats, setQuickStats] = useState({
     todayEarnings: 0,
@@ -80,7 +102,7 @@ const DriverDashboard = () => {
     rating: 5.0,
   });
 
-  // Request browser geolocation
+  // Request browser geolocation ONLY when driver explicitly clicks "Cập Nhật GPS"
   const requestGpsLocation = () => {
     if (!navigator.geolocation) {
       setGpsStatus('Trình duyệt không hỗ trợ Geolocation GPS');
@@ -91,9 +113,21 @@ const DriverDashboard = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setCoords([latitude, longitude]);
-        setGpsStatus(`GPS Thực: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        toast.success('Đã lấy vị trí GPS hiện tại thành công!', 'GPS Real-Time');
+        const newCoords = [latitude, longitude];
+        const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const newStatus = `GPS Hiện Tại: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (${nowTime})`;
+
+        setCoords(newCoords);
+        setGpsStatus(newStatus);
+
+        try {
+          localStorage.setItem('driver_gps_coords', JSON.stringify(newCoords));
+          localStorage.setItem('driver_gps_status', newStatus);
+        } catch (e) {
+          console.warn('Error saving GPS to localStorage:', e);
+        }
+
+        toast.success('Đã cập nhật vị trí GPS hiện tại thành công!', 'Cập Nhật GPS');
 
         if (socket && isOnline) {
           socket.emit('go-online', { lat: latitude, lng: longitude });
@@ -101,28 +135,13 @@ const DriverDashboard = () => {
       },
       (err) => {
         console.warn('Geolocation failed:', err.message);
-        setGpsStatus('Sử dụng vị trí mặc định TP.HCM');
+        const fallbackMsg = 'Không thể lấy vị trí GPS (Sử dụng vị trí mặc định TP.HCM)';
+        setGpsStatus(fallbackMsg);
+        toast.error('Không thể định vị vị trí GPS', 'Lỗi GPS');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
-
-  useEffect(() => {
-    requestGpsLocation();
-    // Continuous watch position
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setCoords([latitude, longitude]);
-          setGpsStatus(`GPS Thực: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        },
-        null,
-        { enableHighAccuracy: true, maximumAge: 5000 }
-      );
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch driver profile & quick stats on mount
   useEffect(() => {

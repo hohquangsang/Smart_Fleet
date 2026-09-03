@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -95,10 +95,12 @@ const CreateOrderPage = () => {
   // Autocomplete state for Pickup search
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const isSelectingPickup = useRef(false); // guard: skip API call after selecting a suggestion
 
   // Autocomplete state for Dropoff search
   const [dropoffSuggestions, setDropoffSuggestions] = useState([]);
   const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
+  const isSelectingDropoff = useRef(false); // guard: skip API call after selecting a suggestion
 
   // Confirm Modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -176,8 +178,15 @@ const CreateOrderPage = () => {
 
   // ── 2. Autocomplete for Pickup Search ─────────────────────
   useEffect(() => {
+    // Skip API call when the address was just set by selecting a suggestion
+    if (isSelectingPickup.current) {
+      isSelectingPickup.current = false;
+      return;
+    }
+
     if (!pickupAddress || pickupAddress.length < 3) {
       setPickupSuggestions([]);
+      setShowPickupSuggestions(false);
       return;
     }
 
@@ -186,10 +195,11 @@ const CreateOrderPage = () => {
         const { data } = await api.get(`/maps/autocomplete?q=${encodeURIComponent(pickupAddress)}`);
         if (data?.data && Array.isArray(data.data)) {
           setPickupSuggestions(data.data);
-          setShowPickupSuggestions(true);
+          setShowPickupSuggestions(data.data.length > 0);
         }
       } catch {
         setPickupSuggestions([]);
+        setShowPickupSuggestions(false);
       }
     }, 350);
 
@@ -197,17 +207,26 @@ const CreateOrderPage = () => {
   }, [pickupAddress]);
 
   const selectPickupSuggestion = (sug) => {
+    isSelectingPickup.current = true; // prevent useEffect from re-calling API
     setPickupAddress(sug.address);
     setPickupLat(sug.lat);
     setPickupLng(sug.lng);
+    setPickupSuggestions([]);
     setShowPickupSuggestions(false);
     toast.success(`Đã chọn điểm đón: ${sug.label}`, 'Địa điểm');
   };
 
   // ── 3. Autocomplete for Dropoff Search ────────────────────
   useEffect(() => {
+    // Skip API call when the address was just set by selecting a suggestion
+    if (isSelectingDropoff.current) {
+      isSelectingDropoff.current = false;
+      return;
+    }
+
     if (!dropoffAddress || dropoffAddress.length < 3) {
       setDropoffSuggestions([]);
+      setShowDropoffSuggestions(false);
       return;
     }
 
@@ -216,10 +235,11 @@ const CreateOrderPage = () => {
         const { data } = await api.get(`/maps/autocomplete?q=${encodeURIComponent(dropoffAddress)}`);
         if (data?.data && Array.isArray(data.data)) {
           setDropoffSuggestions(data.data);
-          setShowDropoffSuggestions(true);
+          setShowDropoffSuggestions(data.data.length > 0);
         }
       } catch {
         setDropoffSuggestions([]);
+        setShowDropoffSuggestions(false);
       }
     }, 350);
 
@@ -227,9 +247,11 @@ const CreateOrderPage = () => {
   }, [dropoffAddress]);
 
   const selectDropoffSuggestion = (sug) => {
+    isSelectingDropoff.current = true; // prevent useEffect from re-calling API
     setDropoffAddress(sug.address);
     setDropoffLat(sug.lat);
     setDropoffLng(sug.lng);
+    setDropoffSuggestions([]);
     setShowDropoffSuggestions(false);
     toast.success(`Đã chọn điểm đến: ${sug.label}`, 'Địa điểm');
   };
@@ -319,9 +341,12 @@ const CreateOrderPage = () => {
                   if (!e.target.value) {
                     setPickupLat(null);
                     setPickupLng(null);
+                    setPickupSuggestions([]);
+                    setShowPickupSuggestions(false);
                   }
                 }}
                 onFocus={() => pickupSuggestions.length > 0 && setShowPickupSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 150)}
               />
 
               {/* Suggestions Dropdown for Pickup */}
@@ -383,9 +408,12 @@ const CreateOrderPage = () => {
                   if (!e.target.value) {
                     setDropoffLat(null);
                     setDropoffLng(null);
+                    setDropoffSuggestions([]);
+                    setShowDropoffSuggestions(false);
                   }
                 }}
                 onFocus={() => dropoffSuggestions.length > 0 && setShowDropoffSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowDropoffSuggestions(false), 150)}
               />
 
               {/* Suggestions Dropdown for Dropoff */}

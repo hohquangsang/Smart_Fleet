@@ -30,7 +30,7 @@ export const getOrders = catchAsync(async (req, res) => {
 
 export const deleteOrders = catchAsync(async (req, res) => {
   const { orderIds } = req.body;
-  const result = await adminService.deleteOrders(orderIds);
+  const result = await adminService.deleteOrders(orderIds, req.user.id);
 
   res.status(200).json({
     success: true,
@@ -91,7 +91,7 @@ export const approveDriver = catchAsync(async (req, res) => {
 
 export const blockDriver = catchAsync(async (req, res) => {
   const { reason } = req.body;
-  const driver = await adminService.blockDriver(req.params.id, reason);
+  const driver = await adminService.blockDriver(req.params.id, req.user.id, reason);
 
   res.status(200).json({
     success: true,
@@ -101,7 +101,7 @@ export const blockDriver = catchAsync(async (req, res) => {
 });
 
 export const unblockDriver = catchAsync(async (req, res) => {
-  const driver = await adminService.unblockDriver(req.params.id);
+  const driver = await adminService.unblockDriver(req.params.id, req.user.id);
 
   res.status(200).json({
     success: true,
@@ -111,7 +111,7 @@ export const unblockDriver = catchAsync(async (req, res) => {
 });
 
 export const resolveDriverAppeal = catchAsync(async (req, res) => {
-  const driver = await adminService.resolveDriverAppeal(req.params.id);
+  const driver = await adminService.resolveDriverAppeal(req.params.id, req.user.id);
 
   res.status(200).json({
     success: true,
@@ -122,7 +122,7 @@ export const resolveDriverAppeal = catchAsync(async (req, res) => {
 
 export const blockUser = catchAsync(async (req, res) => {
   const { reason } = req.body;
-  const user = await adminService.blockUser(req.params.id, reason);
+  const user = await adminService.blockUser(req.params.id, req.user.id, reason);
 
   res.status(200).json({
     success: true,
@@ -132,7 +132,7 @@ export const blockUser = catchAsync(async (req, res) => {
 });
 
 export const unblockUser = catchAsync(async (req, res) => {
-  const user = await adminService.unblockUser(req.params.id);
+  const user = await adminService.unblockUser(req.params.id, req.user.id);
 
   res.status(200).json({
     success: true,

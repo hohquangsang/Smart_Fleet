@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { HiOutlinePhone, HiOutlineChatAlt, HiOutlineCheckCircle, HiOutlineUpload, HiOutlineLocationMarker, HiOutlineArrowRight } from 'react-icons/hi';
+import { HiOutlinePhone, HiOutlineChatAlt, HiOutlineCheckCircle, HiOutlineUpload, HiOutlineLocationMarker, HiOutlineArrowRight, HiOutlineRefresh } from 'react-icons/hi';
 import useToast from '../../hooks/useToast';
 import { SocketContext } from '../../contexts/SocketContext';
 import api from '../../services/api';
@@ -86,6 +86,21 @@ const RecenterMap = ({ coords }) => {
   return null;
 };
 
+const getSavedGpsCoords = () => {
+  try {
+    const saved = localStorage.getItem('driver_gps_coords');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 2 && !isNaN(parsed[0]) && !isNaN(parsed[1])) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading saved GPS coords:', e);
+  }
+  return [10.7769, 106.7009];
+};
+
 const ActiveTripPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,8 +112,8 @@ const ActiveTripPage = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Live Driver GPS Coordinates
-  const [driverCoords, setDriverCoords] = useState([10.7769, 106.7009]);
+  // Live Driver GPS Coordinates (persisted from localStorage, no auto-fetch on mount)
+  const [driverCoords, setDriverCoords] = useState(getSavedGpsCoords);
 
   // Trip stage: 1 = En route to Pickup, 2 = Delivering (IN_TRANSIT), 3 = Completed (DELIVERED)
   const [tripStage, setTripStage] = useState(1);
@@ -117,24 +132,41 @@ const ActiveTripPage = () => {
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState(INCIDENTS[0]);
 
-  // Watch Driver GPS position
-  useEffect(() => {
-    if (!navigator.geolocation) return;
+  // Request browser geolocation ONLY when driver clicks "Cập Nhật GPS"
+  const requestGpsLocation = () => {
+    if (!navigator.geolocation) {
+      toast.warning('Trình duyệt không hỗ trợ Geolocation GPS', 'Lỗi GPS');
+      return;
+    }
 
-    const watchId = navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setDriverCoords([latitude, longitude]);
+        const newCoords = [latitude, longitude];
+        const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const newStatus = `GPS Hiện Tại: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (${nowTime})`;
+
+        setDriverCoords(newCoords);
+
+        try {
+          localStorage.setItem('driver_gps_coords', JSON.stringify(newCoords));
+          localStorage.setItem('driver_gps_status', newStatus);
+        } catch (e) {
+          console.warn('Error saving GPS to localStorage:', e);
+        }
+
         if (socket && orderId) {
           socket.emit('driver:location-update', { orderId, lat: latitude, lng: longitude });
         }
+        toast.success(`Đã cập nhật vị trí GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, 'Cập Nhật GPS');
       },
-      (err) => console.warn('GPS error:', err.message),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      (err) => {
+        console.warn('GPS error:', err.message);
+        toast.error('Không thể lấy vị trí GPS hiện tại', 'Lỗi GPS');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [socket, orderId]);
+  };
 
   // Fetch Order details
   useEffect(() => {
@@ -318,8 +350,17 @@ const ActiveTripPage = () => {
             <button
               type="button"
               className="btn btn--secondary"
+              onClick={requestGpsLocation}
+              style={{ fontSize: '0.75rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+              title="Bấm để cập nhật vị trí GPS hiện tại"
+            >
+              <HiOutlineRefresh /> Cập Nhật GPS
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
               onClick={() => setTestBypassRadius(!testBypassRadius)}
-              style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+              style={{ fontSize: '0.75rem', padding: '6px 12px' }}
             >
               {testBypassRadius ? '⚡ Thử nghiệm: Bỏ qua bán kính' : '🔒 Bán kính GPS thực'}
             </button>

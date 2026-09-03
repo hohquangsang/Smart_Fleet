@@ -2,6 +2,7 @@ import prisma from '../../config/database.js';
 import redis from '../../config/redis.js';
 import { NotFoundError, BadRequestError } from '../../utils/api-error.js';
 import { APPROVAL_STATUS, ORDER_STATUS, REDIS_KEYS, DRIVER_STATUS } from '../../utils/constants.js';
+import { createAuditLog } from '../settings/settings.service.js';
 
 /**
  * Get real-time badge counts for admin sidebar (orders, drivers, users).
@@ -359,7 +360,7 @@ export const getAllOrders = async ({ page = 1, limit = 20, status, search } = {}
 /**
  * Delete multiple orders by IDs.
  */
-export const deleteOrders = async (orderIds = []) => {
+export const deleteOrders = async (orderIds = [], adminUserId = null) => {
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
     throw new BadRequestError('Vui lòng chọn ít nhất 1 đơn hàng để xóa');
   }
@@ -367,6 +368,10 @@ export const deleteOrders = async (orderIds = []) => {
   const deleteResult = await prisma.order.deleteMany({
     where: { id: { in: orderIds } },
   });
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'DELETE_ORDERS', 'ORDER', orderIds.join(','), { count: deleteResult.count, orderIds });
+  }
 
   return { count: deleteResult.count };
 };
@@ -481,12 +486,12 @@ import { unregisterOnlineDriver } from '../order/dispatch.service.js';
 /**
  * Block a driver.
  */
-export const blockDriver = async (driverId, reason) => {
+export const blockDriver = async (driverId, adminUserId, reason) => {
   if (!reason || !reason.trim()) {
     throw new BadRequestError('Vui lòng nhập lý do khóa tài xế');
   }
 
-  const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+  const driver = await prisma.driver.findUnique({ where: { id: driverId }, include: { user: true } });
   if (!driver) throw new NotFoundError('Driver not found');
 
   const updated = await prisma.driver.update({
@@ -515,14 +520,18 @@ export const blockDriver = async (driverId, reason) => {
     message: `Tài khoản tài xế của bạn đã bị khóa bởi Admin. Lý do: "${updated.rejectionReason}". Vui lòng vào trang thông tin cá nhân để khiếu nại mở tài khoản.`,
   });
 
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'BLOCK_DRIVER', 'DRIVER', driverId, { reason: reason.trim(), driverName: updated.user?.fullName });
+  }
+
   return updated;
 };
 
 /**
  * Unblock a driver.
  */
-export const unblockDriver = async (driverId) => {
-  const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+export const unblockDriver = async (driverId, adminUserId) => {
+  const driver = await prisma.driver.findUnique({ where: { id: driverId }, include: { user: true } });
   if (!driver) throw new NotFoundError('Driver not found');
 
   const updated = await prisma.driver.update({
@@ -542,13 +551,17 @@ export const unblockDriver = async (driverId) => {
     message: 'Tài khoản tài xế của bạn đã được Admin mở khóa! Bạn có thể truy cập các trang và nhận đơn bình thường.',
   });
 
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'UNBLOCK_DRIVER', 'DRIVER', driverId, { driverName: updated.user?.fullName });
+  }
+
   return updated;
 };
 
 /**
  * Block a user (Customer).
  */
-export const blockUser = async (userId, reason) => {
+export const blockUser = async (userId, adminUserId, reason) => {
   if (!reason || !reason.trim()) {
     throw new BadRequestError('Vui lòng nhập lý do khóa tài khoản khách hàng');
   }
@@ -579,13 +592,17 @@ export const blockUser = async (userId, reason) => {
     console.error('Socket emit error on blockUser:', err);
   }
 
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'BLOCK_USER', 'USER', userId, { reason: reason.trim(), userName: user.fullName });
+  }
+
   return updated;
 };
 
 /**
  * Unblock a user (Customer).
  */
-export const unblockUser = async (userId) => {
+export const unblockUser = async (userId, adminUserId) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new NotFoundError('User not found');
 
@@ -611,6 +628,10 @@ export const unblockUser = async (userId) => {
     }
   } catch (err) {
     console.error('Socket emit error on unblockUser:', err);
+  }
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'UNBLOCK_USER', 'USER', userId, { userName: user.fullName });
   }
 
   return updated;
@@ -664,6 +685,14 @@ export const updateDriverApproval = async (driverId, adminUserId, action, reject
         where: { id: driver.userId },
       });
 
+      if (adminUserId) {
+        await createAuditLog(adminUserId, 'REJECT_DRIVER', 'DRIVER', driverId, {
+          rejectionReason: rejectionReason.trim(),
+          driverName: driver.user?.fullName,
+          permanentlyDeleted: true,
+        });
+      }
+
       return {
         id: driver.id,
         deleted: true,
@@ -697,6 +726,13 @@ export const updateDriverApproval = async (driverId, adminUserId, action, reject
       message: `Hồ sơ đăng ký tài xế của bạn bị từ chối với lý do: "${updated.rejectionReason}". Vui lòng cập nhật lại thông tin và gửi khiếu nại để Admin xem xét lại.`,
     });
 
+    if (adminUserId) {
+      await createAuditLog(adminUserId, 'REJECT_DRIVER', 'DRIVER', driverId, {
+        rejectionReason: rejectionReason.trim(),
+        driverName: updated.user?.fullName,
+      });
+    }
+
     return updated;
   }
 
@@ -721,6 +757,12 @@ export const updateDriverApproval = async (driverId, adminUserId, action, reject
     approvalStatus: updated.approvalStatus,
     message: 'Hồ sơ của bạn đã được Admin phê duyệt! Bạn có thể bật Online để nhận đơn ngay.',
   });
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'APPROVE_DRIVER', 'DRIVER', driverId, {
+      driverName: updated.user?.fullName,
+    });
+  }
 
   return updated;
 };
@@ -762,7 +804,7 @@ export const getAnalytics = async () => {
 /**
  * Resolve / acknowledge a driver's appeal or complaint without changing approval status.
  */
-export const resolveDriverAppeal = async (driverId) => {
+export const resolveDriverAppeal = async (driverId, adminUserId = null) => {
   const driver = await prisma.driver.findUnique({
     where: { id: driverId },
     include: { user: { select: { id: true, fullName: true, email: true, phoneNumber: true } } },
@@ -790,6 +832,10 @@ export const resolveDriverAppeal = async (driverId) => {
     appealNote: null,
     message: 'Nội dung khiếu nại / giải trình của bạn đã được Admin xem xét và phản hồi.',
   });
+
+  if (adminUserId) {
+    await createAuditLog(adminUserId, 'RESOLVE_APPEAL', 'DRIVER', driverId, { driverName: updated.user?.fullName });
+  }
 
   return updated;
 };

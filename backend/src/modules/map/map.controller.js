@@ -1,5 +1,20 @@
 import catchAsync from '../../utils/catch-async.js';
 
+/**
+ * Build a human-readable address label from Photon GeoJSON feature properties.
+ * Photon returns { name, street, housenumber, city, district, county, state, country }
+ */
+const buildPhotonLabel = (props) => {
+  const parts = [];
+  if (props.name) parts.push(props.name);
+  if (props.street) {
+    parts.push(props.housenumber ? `${props.street} ${props.housenumber}` : props.street);
+  }
+  if (props.district) parts.push(props.district);
+  if (props.city) parts.push(props.city);
+  if (props.state) parts.push(props.state);
+  return parts.filter(Boolean).join(', ') || props.name || 'Địa điểm không rõ';
+};
 
 export const autocompleteAddress = catchAsync(async (req, res) => {
   const { q } = req.query;
@@ -8,25 +23,32 @@ export const autocompleteAddress = catchAsync(async (req, res) => {
   }
 
   const query = q.trim();
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=vn&limit=7&addressdetails=1`;
+
+  // Photon by Komoot – free, no API key, Vietnam bounding box bias
+  // bbox: lon_min,lat_min,lon_max,lat_max
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=7&bbox=102.14441,8.17966,109.46464,23.3932`;
 
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'SmartFleetApp/1.0 (contact@smartfleet.vn)' },
     });
-    const items = await response.json();
+    const geojson = await response.json();
 
-    const suggestions = items.map((item) => ({
-      label: item.display_name.split(',')[0] || item.name || query,
-      address: item.display_name,
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon),
-    }));
+    const features = geojson?.features ?? [];
 
-    res.status(200).json({
-      success: true,
-      data: suggestions,
+    const suggestions = features.map((feature) => {
+      const props = feature.properties ?? {};
+      const [lng, lat] = feature.geometry?.coordinates ?? [0, 0];
+      const label = buildPhotonLabel(props);
+      return {
+        label: props.name || label.split(',')[0],
+        address: label,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+      };
     });
+
+    res.status(200).json({ success: true, data: suggestions });
   } catch (error) {
     console.error('Autocomplete Error:', error);
     res.status(200).json({ success: true, data: [] });
