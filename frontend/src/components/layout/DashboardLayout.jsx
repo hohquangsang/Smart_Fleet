@@ -1,4 +1,4 @@
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -8,6 +8,7 @@ import useToast from '../../hooks/useToast';
 import { SocketContext } from '../../contexts/SocketContext';
 
 const DashboardLayout = ({ title = 'Dashboard' }) => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, updateUser } = useAuth();
   const location = useLocation();
   const socket = useContext(SocketContext);
@@ -97,8 +98,8 @@ const DashboardLayout = ({ title = 'Dashboard' }) => {
 
   return (
     <div className="page-layout">
-      <Sidebar />
-      <main className="page-content">
+      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
+      <main className={`page-content${sidebarCollapsed ? ' page-content--collapsed' : ''}`}>
         <TopBar title={title} />
         <Outlet />
       </main>

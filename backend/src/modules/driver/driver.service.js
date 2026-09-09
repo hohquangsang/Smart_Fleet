@@ -276,11 +276,19 @@ export const getDriverEarnings = async (userId, { period = 'week' } = {}) => {
   });
 
   const history = allDriverOrders.map((o) => ({
+    id: o.id,
     code: `#ORD-${o.id.slice(-8).toUpperCase()}`,
     time: new Date(o.createdAt).toLocaleString('vi-VN'),
     route: `${o.pickupAddress} ➔ ${o.dropoffAddress}`,
+    pickupAddress: o.pickupAddress,
+    dropoffAddress: o.dropoffAddress,
     fare: `${Number(o.totalFare || 0).toLocaleString('vi-VN')} đ`,
+    fareRaw: Number(o.totalFare || 0),
+    distanceKm: o.distanceKm ? Number(o.distanceKm) : null,
     status: o.status,
+    rating: o.rating ?? null,
+    ratingComment: o.ratingComment ?? null,
+    ratingTags: o.ratingTags ?? [],
   }));
 
   const totalAssigned = allDriverOrders.length;

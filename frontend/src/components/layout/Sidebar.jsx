@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { HiOutlineViewGrid, HiOutlineUsers, HiOutlineUserGroup, HiOutlineShoppingCart, HiOutlineMap, HiOutlineDocumentText, HiOutlineTruck, HiOutlineChartBar, HiOutlineLogout, HiOutlineUser, HiOutlineCog } from 'react-icons/hi';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import useAdminNotifications from '../../hooks/useAdminNotifications';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/sidebar.css';
@@ -19,7 +20,7 @@ const driverNavItems = [
   { path: '/driver/profile', label: 'Thông tin cá nhân', icon: <HiOutlineUser /> },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ collapsed = false, onToggle }) => {
   const { user, logout, isAdmin, isDriver } = useAuth();
   const { badgeCounts } = useAdminNotifications();
 
@@ -67,8 +68,20 @@ const Sidebar = () => {
     .slice(0, 2) || '??';
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       <div className="sidebar__logo">
+        <button
+          type="button"
+          className="sidebar__toggle-btn"
+          onClick={onToggle}
+          title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+          aria-label={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+        >
+          {collapsed
+            ? <PanelLeftOpen size={18} />
+            : <PanelLeftClose size={18} />
+          }
+        </button>
         <div className="sidebar__logo-icon">SF</div>
         <div className="sidebar__logo-text">
           Smart<span>Fleet</span>
@@ -79,7 +92,7 @@ const Sidebar = () => {
         {isAdmin ? (
           adminNavGroups.map((grp, gIdx) => (
             <div key={gIdx} style={{ marginBottom: 14 }}>
-              {grp.groupTitle && (
+              {grp.groupTitle && !collapsed && (
                 <div
                   style={{
                     fontSize: '0.7rem',
@@ -102,6 +115,7 @@ const Sidebar = () => {
                     className={({ isActive }) =>
                       `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
                     }
+                    title={collapsed ? item.label : undefined}
                   >
                     <span className="sidebar__nav-icon">{item.icon}</span>
                     <span className="sidebar__nav-label">{item.label}</span>
@@ -127,6 +141,7 @@ const Sidebar = () => {
               className={({ isActive }) =>
                 `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
               }
+              title={collapsed ? item.label : undefined}
             >
               <span className="sidebar__nav-icon">{item.icon}</span>
               <span className="sidebar__nav-label">{item.label}</span>
@@ -140,7 +155,7 @@ const Sidebar = () => {
         <div className="sidebar__user" style={{ cursor: 'default' }}>
           <NavLink
             to={isDriver ? '/driver/profile' : isAdmin ? '/admin/settings' : '/customer/profile'}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, flex: collapsed ? 'none' : 1, textDecoration: 'none', color: 'inherit', overflow: 'hidden' }}
             title="Cập nhật thông tin cá nhân"
           >
             <div className="sidebar__avatar" style={{ overflow: 'hidden', padding: 0 }}>
@@ -156,9 +171,9 @@ const Sidebar = () => {
           </NavLink>
           <button
             type="button"
+            className="sidebar__logout-btn"
             onClick={logout}
             title="Đăng xuất"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
           >
             <HiOutlineLogout style={{ fontSize: '1.2rem', color: 'var(--accent-red)' }} />
           </button>

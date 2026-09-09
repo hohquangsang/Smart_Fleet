@@ -545,6 +545,11 @@
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  transition: margin-left 300ms ease;
+}
+
+.page-content--collapsed {
+  margin-left: 68px;
 }
 
 /* ─── Auth Layout ─────────────────────────────── */

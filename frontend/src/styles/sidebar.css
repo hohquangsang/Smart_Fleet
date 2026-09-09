@@ -10,20 +10,23 @@
   display: flex;
   flex-direction: column;
   z-index: 100;
-  transition: width var(--transition-base);
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
-/* ─── Logo ────────────────────────────────────── */
+/* ─── Logo Header ─────────────────────────────── */
 .sidebar__logo {
   display: flex;
   align-items: center;
   gap: var(--sp-sm);
-  padding: var(--sp-lg) var(--sp-lg);
+  padding: 0 var(--sp-md);
   border-bottom: 1px solid var(--border-primary);
-  min-height: var(--topbar-height);
+  height: var(--topbar-height);
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
+/* SF logo-icon & logo-text: fade in/out on collapse */
 .sidebar__logo-icon {
   width: 32px;
   height: 32px;
@@ -36,6 +39,9 @@
   font-weight: var(--fw-bold);
   font-size: var(--fs-sm);
   flex-shrink: 0;
+  opacity: 1;
+  transition: opacity 200ms ease, width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              margin 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar__logo-text {
@@ -43,10 +49,123 @@
   font-weight: var(--fw-bold);
   color: var(--text-primary);
   white-space: nowrap;
+  opacity: 1;
+  transition: opacity 150ms ease;
+  overflow: hidden;
 }
 
 .sidebar__logo-text span {
   color: var(--accent-blue);
+}
+
+/* ─── Toggle Button ───────────────────────────── */
+.sidebar__toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* Fixed size hit-area, perfectly square */
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar__toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ─── Collapsed state ─────────────────────────── */
+
+/* Sidebar width */
+.sidebar--collapsed {
+  width: 68px;
+}
+
+/* In collapsed mode, hide the SF icon and text — only toggle button stays */
+.sidebar--collapsed .sidebar__logo-icon {
+  opacity: 0;
+  width: 0;
+  margin: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sidebar--collapsed .sidebar__logo-text {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Logo row: center the toggle button when collapsed */
+.sidebar--collapsed .sidebar__logo {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+/* Nav items: center icons, remove left margin effects */
+.sidebar--collapsed .sidebar__nav-item {
+  justify-content: center;
+  padding: 0.65rem 0;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__nav-icon {
+  width: 20px;
+  margin: 0 auto;
+}
+
+/* Hide nav labels smoothly */
+.sidebar--collapsed .sidebar__nav-label {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease, max-width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide badges */
+.sidebar--collapsed .sidebar__badge {
+  display: none;
+}
+
+/* Footer: center the avatar, hide name/role and logout button */
+.sidebar--collapsed .sidebar__footer {
+  padding: var(--sp-sm);
+}
+
+.sidebar--collapsed .sidebar__user {
+  justify-content: center;
+  padding: var(--sp-sm);
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__user > a {
+  flex: unset;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__user-info {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease, max-width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar--collapsed .sidebar__logout-btn {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  padding: 0;
+  transition: opacity 150ms ease, width 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── Navigation ──────────────────────────────── */
@@ -54,13 +173,14 @@
   flex: 1;
   padding: var(--sp-md) var(--sp-sm);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar__nav-item {
   display: flex;
   align-items: center;
   gap: var(--sp-md);
-  padding: 0.7rem var(--sp-md);
+  padding: 0.65rem var(--sp-md);
   margin-bottom: 2px;
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
@@ -99,6 +219,9 @@
 
 .sidebar__nav-label {
   white-space: nowrap;
+  opacity: 1;
+  max-width: 200px;
+  transition: opacity 200ms ease, max-width 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── Badge ───────────────────────────────────── */
@@ -117,18 +240,15 @@
 }
 
 @keyframes badgePulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.08); }
 }
 
 /* ─── Footer ──────────────────────────────────── */
 .sidebar__footer {
   padding: var(--sp-md);
   border-top: 1px solid var(--border-primary);
+  transition: padding 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar__user {
@@ -138,7 +258,8 @@
   padding: var(--sp-sm);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), gap 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              padding 300ms cubic-bezier(0.4, 0, 0.2, 1), justify-content 300ms ease;
 }
 
 .sidebar__user:hover {
@@ -159,8 +280,24 @@
   flex-shrink: 0;
 }
 
+.sidebar__logout-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 1;
+  width: auto;
+  overflow: visible;
+  transition: opacity 200ms ease, width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .sidebar__user-info {
   overflow: hidden;
+  opacity: 1;
+  max-width: 200px;
+  transition: opacity 200ms ease, max-width 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar__user-name {
