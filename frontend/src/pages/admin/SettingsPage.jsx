@@ -25,7 +25,7 @@ const TABS = [
     id: 'system',
     label: 'Hệ Thống',
     icon: <HiOutlineCog />,
-    desc: 'Cấu hình giá cước & matching',
+    desc: 'Cài đặt chung, thông báo & phiên bản app',
     component: SystemConfigTab,
   },
   {
