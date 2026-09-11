@@ -162,6 +162,20 @@ export const emitAdminOrderStatusUpdate = (orderId, { status, label, driver, tot
   }
 };
 
+export const emitMaintenanceMode = (enabled, message) => {
+  try {
+    const io = getIO();
+    if (io) {
+      const payload = { enabled, message, timestamp: new Date().toISOString() };
+      // Broadcast to all customers and drivers
+      io.of('/customer').emit('system:maintenance', payload);
+      io.of('/driver').emit('system:maintenance', payload);
+    }
+  } catch {
+    // Socket not initialized
+  }
+};
+
 export default {
   emitCustomerOrderStatus,
   emitAdminNewOrderRequest,
@@ -172,4 +186,5 @@ export default {
   emitDriverOrderConfirmed,
   emitAdminNewDriverRegistered,
   emitDriverApprovalUpdated,
+  emitMaintenanceMode,
 };

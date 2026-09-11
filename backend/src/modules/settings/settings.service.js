@@ -108,6 +108,36 @@ export const updateAdminAvatar = async (adminId, avatarBase64) => {
   return user;
 };
 
+// ─── Maintenance Mode ───────────────────────────────────────────────────────
+export const getMaintenanceMode = async () => {
+  const cfg = await prisma.systemConfig.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
+  return { enabled: cfg?.value === 'true', message: cfg?.label || 'Hệ thống đang bảo trì. Vui lòng quay lại sau.' };
+};
+
+export const setMaintenanceMode = async (enabled, message, adminId) => {
+  const value = enabled ? 'true' : 'false';
+  const label = message || 'Hệ thống đang bảo trì. Vui lòng quay lại sau.';
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'MAINTENANCE_MODE' },
+    update: { value, label, updatedBy: adminId },
+    create: { key: 'MAINTENANCE_MODE', value, label, group: 'GENERAL', updatedBy: adminId },
+  });
+
+  // Invalidate Redis cache
+  try { await redis.del(REDIS_CONFIG_KEY); } catch { /* ignore */ }
+
+  await createAuditLog(
+    adminId,
+    enabled ? 'ENABLE_MAINTENANCE' : 'DISABLE_MAINTENANCE',
+    'CONFIG',
+    null,
+    { enabled, message: label }
+  );
+
+  return { enabled, message: label };
+};
+
 // ─── System Config ──────────────────────────────────────────────────────────
 export const getSystemConfig = async () => {
   // Try Redis cache first

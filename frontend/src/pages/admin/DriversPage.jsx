@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HiOutlineSearch, HiOutlineDocumentText, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineLockClosed, HiOutlineLockOpen, HiOutlineX } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
@@ -6,6 +7,7 @@ import { SocketContext } from '../../contexts/SocketContext';
 import '../../styles/admin.css';
 
 const DriversPage = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const socket = useContext(SocketContext);
   const [drivers, setDrivers] = useState([]);
@@ -274,10 +276,8 @@ const DriversPage = () => {
     <div className="admin-container">
       <div className="admin-header-bar">
         <div>
-          <h1 className="admin-title">Quản Lý Hồ Sơ Tài Xế</h1>
-          <p className="admin-subtitle">
-            Phê duyệt tài khoản tài xế mới, kiểm tra giấy tờ xác minh và quản lý trạng thái hoạt động
-          </p>
+          <h1 className="admin-title">{t('driversPage.title')}</h1>
+          <p className="admin-subtitle">{t('driversPage.subtitle')}</p>
         </div>
       </div>
 
@@ -285,35 +285,35 @@ const DriversPage = () => {
       <div className="admin-filter-bar">
         <div className="admin-chip-group">
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500, marginRight: 4 }}>
-            Lọc trạng thái:
+            {t('driversPage.filter_label')}
           </span>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'ALL' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('ALL')}
           >
-            Tất cả ({drivers.length})
+            {t('driversPage.filter_all')} ({drivers.length})
           </button>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'PENDING' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('PENDING')}
           >
-            Chờ duyệt ({drivers.filter((d) => d.approvalStatus === 'PENDING').length})
+            {t('driversPage.filter_pending')} ({drivers.filter((d) => d.approvalStatus === 'PENDING').length})
           </button>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'APPROVED' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('APPROVED')}
           >
-            Đã duyệt ({drivers.filter((d) => d.approvalStatus === 'APPROVED').length})
+            {t('driversPage.filter_approved')} ({drivers.filter((d) => d.approvalStatus === 'APPROVED').length})
           </button>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'BLOCKED' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('BLOCKED')}
           >
-            Bị khóa ({drivers.filter((d) => d.approvalStatus === 'BLOCKED').length})
+            {t('driversPage.filter_blocked')} ({drivers.filter((d) => d.approvalStatus === 'BLOCKED').length})
           </button>
           <button
             type="button"
@@ -324,7 +324,7 @@ const DriversPage = () => {
               color: statusFilter === 'APPEALED' ? '#F5A623' : undefined,
             }}
           >
-            ⚠️ Có khiếu nại ({drivers.filter((d) => d.isAppealed).length})
+            {t('driversPage.filter_appealed')} ({drivers.filter((d) => d.isAppealed).length})
           </button>
         </div>
 
@@ -333,7 +333,7 @@ const DriversPage = () => {
           <input
             type="text"
             className="input"
-            placeholder="Tìm theo tên, SĐT, biển số..."
+            placeholder={t('driversPage.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -345,20 +345,20 @@ const DriversPage = () => {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Tài xế</th>
-              <th>Phương tiện & Biển số</th>
-              <th>Trạng thái duyệt</th>
-              <th>Hoạt động</th>
-              <th>Đánh giá</th>
-              <th>Ngày tham gia</th>
-              <th style={{ textAlign: 'right' }}>Thao tác</th>
+              <th>{t('driversPage.col_driver')}</th>
+              <th>{t('driversPage.col_vehicle')}</th>
+              <th>{t('driversPage.col_approval')}</th>
+              <th>{t('driversPage.col_activity')}</th>
+              <th>{t('driversPage.col_rating')}</th>
+              <th>{t('driversPage.col_joined')}</th>
+              <th style={{ textAlign: 'right' }}>{t('driversPage.col_actions')}</th>
             </tr>
           </thead>
           <tbody>
             {filteredDrivers.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                  Không tìm thấy tài xế nào khớp với bộ lọc.
+                  {t('driversPage.no_results')}
                 </td>
               </tr>
             ) : (
@@ -388,7 +388,7 @@ const DriversPage = () => {
                     <td>
                       {isPending && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                          <span className="badge-status badge-status--pending">Chờ duyệt</span>
+                          <span className="badge-status badge-status--pending">{t('driversPage.status_pending')}</span>
                           {driver.isAppealed && (
                             <div
                               className="appeal-badge appeal-badge--pending"
@@ -401,14 +401,14 @@ const DriversPage = () => {
                               }}
                             >
                               <span className="appeal-badge__dot" />
-                              <span>📢 Đã gửi khiếu nại</span>
+                              <span>{t('driversPage.status_appealed')}</span>
                             </div>
                           )}
                         </div>
                       )}
                       {isApproved && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                          <span className="badge-status badge-status--approved">Đã duyệt</span>
+                          <span className="badge-status badge-status--approved">{t('driversPage.status_approved')}</span>
                           {driver.isAppealed && (
                             <div
                               className="appeal-badge appeal-badge--approved"
@@ -421,14 +421,14 @@ const DriversPage = () => {
                               }}
                             >
                               <span className="appeal-badge__dot" />
-                              <span>⚠️ Có khiếu nại</span>
+                              <span>{t('driversPage.status_appealed_approved')}</span>
                             </div>
                           )}
                         </div>
                       )}
                       {isBlocked && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                          <span className="badge-status badge-status--blocked">Bị khóa</span>
+                          <span className="badge-status badge-status--blocked">{t('driversPage.status_blocked')}</span>
                           {driver.isAppealed && (
                             <div
                               className="appeal-badge appeal-badge--blocked"
@@ -441,7 +441,7 @@ const DriversPage = () => {
                               }}
                             >
                               <span className="appeal-badge__dot" />
-                              <span>📢 Yêu cầu mở khóa</span>
+                              <span>{t('driversPage.status_unlock_request')}</span>
                             </div>
                           )}
                         </div>
@@ -476,7 +476,7 @@ const DriversPage = () => {
                           setActionReason('');
                         }}
                       >
-                        Xem hồ sơ
+                        {t('driversPage.btn_view_profile')}
                       </button>
                     </td>
                   </tr>
@@ -494,7 +494,7 @@ const DriversPage = () => {
           <div className="admin-drawer">
             <div className="admin-drawer-header">
               <h3 style={{ fontFamily: 'var(--font-heading)', textTransform: 'uppercase' }}>
-                Chi Tiết Hồ Sơ Tài Xế
+                {t('driversPage.drawer_title')}
               </h3>
               <button type="button" className="toast-card__close" onClick={() => setSelectedDriver(null)}>
                 &times;
@@ -513,21 +513,21 @@ const DriversPage = () => {
                 <div>
                   <h2 style={{ fontSize: '1.25rem', color: 'var(--text-primary)' }}>{selectedDriver.name}</h2>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 2 }}>
-                    SĐT: {selectedDriver.phone}
+                    {t('driversPage.phone_prefix')} {selectedDriver.phone}
                   </div>
                   <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
                     {selectedDriver.approvalStatus === 'PENDING' && (
-                      <span className="badge-status badge-status--pending">Chờ duyệt</span>
+                      <span className="badge-status badge-status--pending">{t('driversPage.status_pending')}</span>
                     )}
                     {selectedDriver.approvalStatus === 'APPROVED' && (
-                      <span className="badge-status badge-status--approved">Đã duyệt</span>
+                      <span className="badge-status badge-status--approved">{t('driversPage.status_approved')}</span>
                     )}
                     {selectedDriver.approvalStatus === 'BLOCKED' && (
-                      <span className="badge-status badge-status--blocked">Bị khóa</span>
+                      <span className="badge-status badge-status--blocked">{t('driversPage.status_blocked')}</span>
                     )}
                     {selectedDriver.isAppealed && (
                       <span style={{ fontSize: '0.75rem', background: 'rgba(245,166,35,0.2)', color: '#F5A623', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                        📢 Khiếu nại
+                        {t('driversPage.chip_appealed')}
                       </span>
                     )}
                   </div>
@@ -545,7 +545,7 @@ const DriversPage = () => {
                   }}
                 >
                   <div style={{ fontWeight: 700, color: '#F5A623', fontSize: '0.85rem' }}>
-                    📢 NỘI DUNG KHIẾU NẠI / GIẢI TRÌNH TỪ TÀI XẾ:
+                    {t('driversPage.appeal_label')}
                   </div>
                   <div style={{ color: 'var(--text-primary)', marginTop: 4, fontStyle: 'italic', fontSize: '0.9rem' }}>
                     "{selectedDriver.appealNote || 'Tài xế đã cập nhật thông tin và đề nghị xem xét lại.'}"
@@ -564,7 +564,7 @@ const DriversPage = () => {
                   }}
                 >
                   <div style={{ fontWeight: 700, color: 'var(--accent-red)', fontSize: '0.8rem' }}>
-                    ❌ LÝ DO TỪ CHỐI LẦN TRƯỚC (Lần {selectedDriver.rejectionCount || 1}):
+                    {t('driversPage.rejection_label')} (Lần {selectedDriver.rejectionCount || 1}):
                   </div>
                   <div style={{ color: 'var(--accent-red)', marginTop: 2, fontSize: '0.85rem' }}>
                     {selectedDriver.rejectionReason}
@@ -585,25 +585,25 @@ const DriversPage = () => {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>LOẠI PHƯƠNG TIỆN</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('driversPage.col_vehicle_type')}</div>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
                     {selectedDriver.vehicleType}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BIỂN SỐ XE</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('driversPage.col_license_plate')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-green)', marginTop: 2 }}>
                     {selectedDriver.licensePlate}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>NGÀY THAM GIA</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('driversPage.col_joined_date')}</div>
                   <div style={{ fontWeight: 500, color: 'var(--text-secondary)', marginTop: 2 }}>
                     {selectedDriver.createdAt}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TRẠNG THÁI GPS</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('driversPage.col_gps')}</div>
                   <div style={{ fontWeight: 600, color: selectedDriver.isOnline ? 'var(--accent-green)' : 'var(--text-muted)', marginTop: 2 }}>
                     {selectedDriver.isOnline ? '● Online' : '○ Offline'}
                   </div>
@@ -613,19 +613,19 @@ const DriversPage = () => {
               {/* Khối Hiệu suất: 3 ô nhỏ */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                 <div style={{ background: 'var(--bg-panel-sub)', padding: '10px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border-primary)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ĐÁNH GIÁ</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('driversPage.perf_rating')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#F5A623', fontSize: '1.1rem', marginTop: 2 }}>
                     ★ {selectedDriver.rating.toFixed(1)}
                   </div>
                 </div>
                 <div style={{ background: 'var(--bg-panel-sub)', padding: '10px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border-primary)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>NHẬN ĐƠN</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('driversPage.perf_accept')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-blue)', fontSize: '1.1rem', marginTop: 2 }}>
                     {selectedDriver.acceptRate}
                   </div>
                 </div>
                 <div style={{ background: 'var(--bg-panel-sub)', padding: '10px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border-primary)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>HOÀN THÀNH</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('driversPage.perf_complete')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-green)', fontSize: '1.1rem', marginTop: 2 }}>
                     {selectedDriver.completeRate}
                   </div>
@@ -635,7 +635,7 @@ const DriversPage = () => {
               {/* Khối Giấy tờ xác minh (Hình ảnh thực tế từ Driver) */}
               <div>
                 <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Giấy Tờ Xác Minh Đã Tải Lên
+                  {t('driversPage.doc_verification')}
                 </h4>
                 <div className="docs-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div
@@ -670,7 +670,7 @@ const DriversPage = () => {
                     ) : (
                       <>
                         <HiOutlineDocumentText className="doc-icon" />
-                        <span className="doc-title">Chưa có ảnh CCCD</span>
+                        <span className="doc-title">{t('driversPage.no_cccd')}</span>
                       </>
                     )}
                   </div>
@@ -707,7 +707,7 @@ const DriversPage = () => {
                     ) : (
                       <>
                         <HiOutlineDocumentText className="doc-icon" />
-                        <span className="doc-title">Chưa có Bằng Lái Xe</span>
+                        <span className="doc-title">{t('driversPage.no_license')}</span>
                       </>
                     )}
                   </div>
@@ -729,7 +729,7 @@ const DriversPage = () => {
                         disabled={processing}
                         onClick={() => handleApprove(selectedDriver)}
                       >
-                        <HiOutlineCheckCircle /> Duyệt Hồ Sơ
+                        <HiOutlineCheckCircle /> {t('driversPage.btn_approve')}
                       </button>
                       <button
                         type="button"
@@ -740,18 +740,18 @@ const DriversPage = () => {
                           setShowReasonInput(true);
                         }}
                       >
-                        <HiOutlineXCircle /> Từ Chối
+                        <HiOutlineXCircle /> {t('driversPage.btn_reject')}
                       </button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <label style={{ fontSize: '0.8rem', color: 'var(--accent-red)', fontWeight: 600 }}>
-                        Vui lòng nhập lý do từ chối hồ sơ (bắt buộc):
+                        {t('driversPage.reject_reason_label')}
                       </label>
                       <input
                         type="text"
                         className="location-input"
-                        placeholder="VD: Ảnh GPLX bị mờ, không rõ biển số..."
+                        placeholder={t('driversPage.reject_reason_placeholder')}
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
                         autoFocus
@@ -764,7 +764,7 @@ const DriversPage = () => {
                           disabled={processing}
                           onClick={handleConfirmActionWithReason}
                         >
-                          Xác Nhận Từ Chối
+                          {t('driversPage.btn_confirm_reject')}
                         </button>
                         <button
                           type="button"

@@ -6,7 +6,10 @@ import { ROLES } from '../../utils/constants.js';
 
 const router = Router();
 
-// All settings routes require authentication and ADMIN role
+// ── Public Maintenance Status (Unauthenticated) ─────────────
+router.get('/public-maintenance', settingsController.getMaintenance);
+
+// All remaining settings routes require authentication and ADMIN role
 router.use(auth);
 router.use(authorize(ROLES.ADMIN));
 
@@ -16,9 +19,13 @@ router.patch('/profile', settingsController.updateProfile);
 router.patch('/profile/password', settingsController.changePassword);
 router.post('/profile/avatar', settingsController.uploadAvatar);
 
-// ── System Config ─────────────────────────────────────────
+// ── System Config ──────────────────────────────────────────────────
 router.get('/config', settingsController.getConfig);
 router.patch('/config', settingsController.updateConfig);
+
+// ── Maintenance Mode ────────────────────────────────────────────
+router.get('/maintenance', settingsController.getMaintenance);
+router.patch('/maintenance', settingsController.setMaintenance);
 
 // ── Admin Accounts ────────────────────────────────────────
 router.get('/admins', settingsController.getAdmins);

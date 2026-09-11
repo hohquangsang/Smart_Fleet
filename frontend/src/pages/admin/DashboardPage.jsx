@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   HiOutlineUsers,
@@ -16,6 +17,7 @@ import { SocketContext } from '../../contexts/SocketContext';
 import '../../styles/admin.css';
 
 const DashboardPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const socket = useContext(SocketContext);
   const toast = useToast();
@@ -272,7 +274,7 @@ const DashboardPage = () => {
         {/* Card 1: TỔNG TÀI XẾ */}
         <div className="kpi-card">
           <div className="kpi-card__top">
-            <span className="kpi-card__title">TỔNG TÀI XẾ</span>
+            <span className="kpi-card__title">{t('dashboard.kpi_drivers')}</span>
             <div className="kpi-card__badge-icon kpi-card__badge-icon--blue">
               <HiOutlineTruck />
             </div>
@@ -280,7 +282,7 @@ const DashboardPage = () => {
           <div className="kpi-card__val">{stats.totalDrivers}</div>
           <div style={{ marginTop: '4px' }}>
             <span className="trend-badge trend-badge--green">
-              <HiOutlineTrendingUp /> +{stats.driversWeekDiff} so với tuần trước
+              <HiOutlineTrendingUp /> +{stats.driversWeekDiff} {t('dashboard.vs_last_week')}
             </span>
           </div>
         </div>
@@ -288,21 +290,21 @@ const DashboardPage = () => {
         {/* Card 2: CHỜ DUYỆT HỒ SƠ */}
         <div className="kpi-card">
           <div className="kpi-card__top">
-            <span className="kpi-card__title">CHỜ DUYỆT HỒ SƠ</span>
+            <span className="kpi-card__title">{t('dashboard.kpi_pending')}</span>
             <div className="kpi-card__badge-icon kpi-card__badge-icon--amber">
               <HiOutlineExclamationCircle />
             </div>
           </div>
           <div className="kpi-card__val kpi-card__val--orange">{stats.pendingDrivers}</div>
           <div className="kpi-card__sub" style={{ color: '#F5A623', fontWeight: 600, marginTop: '4px' }}>
-            · {stats.pendingDrivers} hồ sơ cần duyệt
+            · {stats.pendingDrivers} {t('dashboard.kpi_pending_sub')}
           </div>
         </div>
 
         {/* Card 3: TỔNG NGƯỜI DÙNG */}
         <div className="kpi-card">
           <div className="kpi-card__top">
-            <span className="kpi-card__title">TỔNG NGƯỜI DÙNG</span>
+            <span className="kpi-card__title">{t('dashboard.kpi_users')}</span>
             <div className="kpi-card__badge-icon kpi-card__badge-icon--blue">
               <HiOutlineUsers />
             </div>
@@ -310,7 +312,7 @@ const DashboardPage = () => {
           <div className="kpi-card__val">{stats.totalUsers}</div>
           <div style={{ marginTop: '4px' }}>
             <span className="trend-badge trend-badge--green">
-              <HiOutlineTrendingUp /> +{stats.usersWeekDiff} khách hàng đăng ký
+              <HiOutlineTrendingUp /> +{stats.usersWeekDiff} {t('dashboard.kpi_users_trend')}
             </span>
           </div>
         </div>
@@ -318,7 +320,7 @@ const DashboardPage = () => {
         {/* Card 4: ĐƠN HOÀN THÀNH HÔM NAY */}
         <div className="kpi-card">
           <div className="kpi-card__top">
-            <span className="kpi-card__title">ĐƠN HOÀN THÀNH HÔM NAY</span>
+            <span className="kpi-card__title">{t('dashboard.kpi_orders')}</span>
             <div className="kpi-card__badge-icon kpi-card__badge-icon--green">
               <HiOutlineCurrencyDollar />
             </div>
@@ -326,7 +328,7 @@ const DashboardPage = () => {
           <div className="kpi-card__val kpi-card__val--green">{stats.completedToday}</div>
           <div style={{ marginTop: '4px' }}>
             <span className="trend-badge trend-badge--red" style={{ background: 'transparent', padding: 0 }}>
-              <HiOutlineTrendingDown /> {stats.revenueToday.toLocaleString('vi-VN')}đ doanh thu hôm nay
+              <HiOutlineTrendingDown /> {stats.revenueToday.toLocaleString('vi-VN')}đ {t('dashboard.kpi_revenue_today')}
             </span>
           </div>
         </div>
@@ -337,19 +339,19 @@ const DashboardPage = () => {
         {/* Left: Đơn hàng & doanh thu 7 ngày */}
         <div className="dashboard-card">
           <div className="dashboard-card__header">
-            <h3 className="dashboard-card__title">Đơn hàng & doanh thu 7 ngày</h3>
+            <h3 className="dashboard-card__title">{t('dashboard.chart_title')}</h3>
             <div className="chart-tab-group">
               <button
                 className={`chart-tab-btn ${activeChartTab === 'orders' ? 'chart-tab-btn--active' : ''}`}
                 onClick={() => setActiveChartTab('orders')}
               >
-                Đơn hàng
+                {t('dashboard.chart_tab_orders')}
               </button>
               <button
                 className={`chart-tab-btn ${activeChartTab === 'revenue' ? 'chart-tab-btn--active' : ''}`}
                 onClick={() => setActiveChartTab('revenue')}
               >
-                Doanh thu
+                {t('dashboard.chart_tab_revenue')}
               </button>
             </div>
           </div>
@@ -439,7 +441,7 @@ const DashboardPage = () => {
                 }}
               >
                 {activeChartTab === 'orders'
-                  ? `${hoverPoint.val} đơn hàng`
+                  ? `${hoverPoint.val} ${t('dashboard.chart_orders_unit')}`
                   : `${hoverPoint.val.toLocaleString('vi-VN')} đ`}
               </div>
             )}
@@ -449,7 +451,7 @@ const DashboardPage = () => {
         {/* Right: Vị trí tài xế real-time */}
         <div className="dashboard-card">
           <div className="dashboard-card__header">
-            <h3 className="dashboard-card__title">Vị trí tài xế real-time</h3>
+            <h3 className="dashboard-card__title">{t('dashboard.map_title')}</h3>
             <span
               style={{
                 fontSize: '0.8rem',
@@ -470,7 +472,7 @@ const DashboardPage = () => {
                   display: 'inline-block',
                 }}
               />
-              Trực tiếp
+              {t('dashboard.map_live')}
             </span>
           </div>
 
@@ -495,11 +497,11 @@ const DashboardPage = () => {
             <div className="map-legend-box">
               <div className="map-legend-item">
                 <span className="legend-dot legend-dot--green" />
-                <span>Đang rảnh</span>
+                <span>{t('dashboard.map_available')}</span>
               </div>
               <div className="map-legend-item">
                 <span className="legend-dot legend-dot--yellow" />
-                <span>Đang giao</span>
+                <span>{t('dashboard.map_delivering')}</span>
               </div>
             </div>
           </div>
@@ -511,14 +513,14 @@ const DashboardPage = () => {
         {/* Left: Đơn hàng gần đây */}
         <div className="dashboard-card">
           <div className="dashboard-card__header">
-            <h3 className="dashboard-card__title">Đơn hàng gần đây</h3>
+            <h3 className="dashboard-card__title">{t('dashboard.recent_orders_title')}</h3>
             <button
               type="button"
               className="dashboard-card__link"
               onClick={() => navigate('/admin/orders')}
               style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 0 }}
             >
-              Xem tất cả <HiOutlineArrowRight />
+              {t('dashboard.view_all')} <HiOutlineArrowRight />
             </button>
           </div>
 
@@ -526,11 +528,11 @@ const DashboardPage = () => {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>MÃ ĐƠN</th>
-                  <th>KHÁCH HÀNG</th>
-                  <th>TÀI XẾ</th>
-                  <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
-                  <th>GIỜ TẠO</th>
+                  <th>{t('dashboard.col_order_code')}</th>
+                  <th>{t('dashboard.col_customer')}</th>
+                  <th>{t('dashboard.col_driver')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('dashboard.col_status')}</th>
+                  <th>{t('dashboard.col_time')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -562,21 +564,21 @@ const DashboardPage = () => {
         {/* Right: Hồ sơ chờ duyệt */}
         <div className="dashboard-card">
           <div className="dashboard-card__header">
-            <h3 className="dashboard-card__title">Hồ sơ chờ duyệt</h3>
+            <h3 className="dashboard-card__title">{t('dashboard.pending_title')}</h3>
             <button
               type="button"
               className="dashboard-card__link"
               onClick={() => navigate('/admin/drivers?approval=pending')}
               style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 0 }}
             >
-              Xem tất cả <HiOutlineArrowRight />
+              {t('dashboard.view_all')} <HiOutlineArrowRight />
             </button>
           </div>
 
           <div className="pending-drivers-list">
             {pendingDriversList.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#8a94a6', fontSize: '0.875rem' }}>
-                ✓ Hiện không có hồ sơ nào đang chờ duyệt
+                {t('dashboard.pending_empty')}
               </div>
             ) : (
               pendingDriversList.map((drv) => (
@@ -594,13 +596,13 @@ const DashboardPage = () => {
                       className="btn-approve"
                       onClick={() => handleApproveDriver(drv.id, drv.fullName)}
                     >
-                      Duyệt
+                      {t('dashboard.btn_approve')}
                     </button>
                     <button
                       className="btn-reject"
                       onClick={() => handleOpenRejectModal(drv.id, drv.fullName)}
                     >
-                      Từ chối
+                      {t('dashboard.btn_reject')}
                     </button>
                   </div>
                 </div>
@@ -615,7 +617,7 @@ const DashboardPage = () => {
         <div className="modal-overlay" onClick={() => setRejectModal({ ...rejectModal, isOpen: false })}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 className="modal-title">Từ Chối Hồ Sơ Tài Xế</h4>
+              <h4 className="modal-title">{t('dashboard.modal_reject_title')}</h4>
               <button
                 onClick={() => setRejectModal({ ...rejectModal, isOpen: false })}
                 style={{ background: 'none', border: 'none', color: '#8a94a6', cursor: 'pointer', fontSize: '1.2rem' }}
@@ -625,7 +627,7 @@ const DashboardPage = () => {
             </div>
 
             <p style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
-              Nhập lý do từ chối hồ sơ đăng ký của tài xế <strong>{rejectModal.driverName}</strong>:
+              {t('dashboard.modal_reject_desc')} <strong>{rejectModal.driverName}</strong>:
             </p>
 
             {/* Quick Reason Suggestions */}
@@ -649,7 +651,7 @@ const DashboardPage = () => {
             <textarea
               className="input"
               rows={3}
-              placeholder="Nhập lý do từ chối chi tiết..."
+              placeholder={t('dashboard.modal_reject_placeholder')}
               value={rejectModal.reason}
               onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
               style={{ resize: 'none', width: '100%', fontSize: '0.875rem' }}
@@ -661,10 +663,10 @@ const DashboardPage = () => {
                 type="button"
                 onClick={() => setRejectModal({ ...rejectModal, isOpen: false })}
               >
-                Hủy
+                {t('dashboard.btn_cancel')}
               </button>
               <button className="btn-approve" style={{ background: '#f0576b', color: '#ffffff' }} onClick={handleConfirmRejectDriver}>
-                Xác Nhận Từ Chối
+                {t('dashboard.btn_confirm_reject')}
               </button>
             </div>
           </div>

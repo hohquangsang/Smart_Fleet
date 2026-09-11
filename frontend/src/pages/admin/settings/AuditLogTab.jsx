@@ -23,6 +23,8 @@ const ACTION_META = {
   DELETE_ADMIN: { label: 'Xóa tài khoản admin', icon: '🗑️', cls: 'audit-icon--delete' },
   DISABLE_ADMIN: { label: 'Vô hiệu hóa admin', icon: '🚫', cls: 'audit-icon--block' },
   ENABLE_ADMIN: { label: 'Kích hoạt admin', icon: '✅', cls: 'audit-icon--approve' },
+  ENABLE_MAINTENANCE: { label: 'Bật bảo trì hệ thống', icon: '🔧', cls: 'audit-icon--block' },
+  DISABLE_MAINTENANCE: { label: 'Tắt bảo trì hệ thống', icon: '⚡', cls: 'audit-icon--approve' },
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -282,9 +284,14 @@ const AuditLogTab = () => {
                           {getInitials(log.admin?.fullName)}
                         </span>
                         {log.admin?.fullName || 'Admin'}
-                        {log.targetType && log.targetId && (
+                        {log.targetType && log.targetId && log.targetId !== 'MAINTENANCE_MODE' && (
                           <span style={{ opacity: 0.6 }}>
-                            · {log.targetType} #{log.targetId.slice(-8).toUpperCase()}
+                            · {log.targetType} #{log.targetId.length > 8 ? log.targetId.slice(-8).toUpperCase() : log.targetId}
+                          </span>
+                        )}
+                        {log.details?.message && (
+                          <span style={{ opacity: 0.75, fontStyle: 'italic' }}>
+                            · "{log.details.message}"
                           </span>
                         )}
                       </span>

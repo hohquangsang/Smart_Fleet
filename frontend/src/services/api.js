@@ -38,7 +38,9 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         localStorage.clear();
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
       }
     }
 

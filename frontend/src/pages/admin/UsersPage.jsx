@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HiOutlineSearch, HiOutlineLockClosed, HiOutlineLockOpen, HiOutlineShoppingBag, HiOutlineX } from 'react-icons/hi';
 import api from '../../services/api';
 import useToast from '../../hooks/useToast';
@@ -8,6 +9,7 @@ import { useContext } from 'react';
 import { SocketContext } from '../../contexts/SocketContext';
 
 const UsersPage = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const socket = useContext(SocketContext);
   const [users, setUsers] = useState([]);
@@ -116,10 +118,8 @@ const UsersPage = () => {
     <div className="admin-container">
       <div className="admin-header-bar">
         <div>
-          <h1 className="admin-title">Quản Lý Người Dùng (Khách Hàng)</h1>
-          <p className="admin-subtitle">
-            Danh sách tài khoản khách hàng, lịch sử chi tiêu và quản lý quyền truy cập
-          </p>
+          <h1 className="admin-title">{t('usersPage.title')}</h1>
+          <p className="admin-subtitle">{t('usersPage.subtitle')}</p>
         </div>
       </div>
 
@@ -127,28 +127,28 @@ const UsersPage = () => {
       <div className="admin-filter-bar">
         <div className="admin-chip-group">
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500, marginRight: 4 }}>
-            Trạng thái:
+            {t('usersPage.filter_status')}
           </span>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'ALL' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('ALL')}
           >
-            Tất cả ({users.length})
+            {t('usersPage.filter_all')} ({users.length})
           </button>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'ACTIVE' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('ACTIVE')}
           >
-            Hoạt động ({users.filter((u) => u.status === 'ACTIVE').length})
+            {t('usersPage.filter_active')} ({users.filter((u) => u.status === 'ACTIVE').length})
           </button>
           <button
             type="button"
             className={`admin-filter-chip ${statusFilter === 'BLOCKED' ? 'admin-filter-chip--active' : ''}`}
             onClick={() => setStatusFilter('BLOCKED')}
           >
-            Bị khóa ({users.filter((u) => u.status === 'BLOCKED').length})
+            {t('usersPage.filter_blocked')} ({users.filter((u) => u.status === 'BLOCKED').length})
           </button>
         </div>
 
@@ -157,7 +157,7 @@ const UsersPage = () => {
           <input
             type="text"
             className="input"
-            placeholder="Tìm theo tên, SĐT, email..."
+            placeholder={t('usersPage.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -169,20 +169,20 @@ const UsersPage = () => {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Người dùng</th>
-              <th>Liên hệ</th>
-              <th>Số đơn</th>
-              <th>Tổng chi tiêu</th>
-              <th>Trạng thái</th>
-              <th>Ngày tham gia</th>
-              <th style={{ textAlign: 'right' }}>Thao tác</th>
+              <th>{t('usersPage.col_user')}</th>
+              <th>{t('usersPage.col_contact')}</th>
+              <th>{t('usersPage.col_orders')}</th>
+              <th>{t('usersPage.col_spent')}</th>
+              <th>{t('usersPage.col_status')}</th>
+              <th>{t('usersPage.col_joined')}</th>
+              <th style={{ textAlign: 'right' }}>{t('usersPage.col_actions')}</th>
             </tr>
           </thead>
           <tbody>
             {filteredUsers.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                  Không tìm thấy người dùng nào phù hợp.
+                  {t('usersPage.no_results')}
                 </td>
               </tr>
             ) : (
@@ -216,7 +216,7 @@ const UsersPage = () => {
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                        {userObj.ordersCount} đơn
+                        {userObj.ordersCount} {t('usersPage.orders_unit')}
                       </span>
                     </td>
                     <td>
@@ -226,10 +226,10 @@ const UsersPage = () => {
                     </td>
                     <td>
                       {isActive ? (
-                        <span className="badge-status badge-status--active">Hoạt động</span>
+                        <span className="badge-status badge-status--active">{t('usersPage.status_active')}</span>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <span className="badge-status badge-status--blocked">Bị khóa</span>
+                          <span className="badge-status badge-status--blocked">{t('usersPage.status_blocked')}</span>
                           {userObj.isAppealed && (
                             <span
                               style={{
@@ -241,7 +241,7 @@ const UsersPage = () => {
                                 fontWeight: 700,
                               }}
                             >
-                              📢 Có khiếu nại mở khóa
+                              {t('usersPage.status_appealed')}
                             </span>
                           )}
                         </div>
@@ -258,7 +258,7 @@ const UsersPage = () => {
                           setBlockReason('');
                         }}
                       >
-                        Xem hồ sơ
+                        {t('usersPage.btn_view_profile')}
                       </button>
                     </td>
                   </tr>
@@ -276,7 +276,7 @@ const UsersPage = () => {
           <div className="admin-drawer">
             <div className="admin-drawer-header">
               <h3 style={{ fontFamily: 'var(--font-heading)', textTransform: 'uppercase' }}>
-                Hồ Sơ Người Dùng
+                {t('usersPage.drawer_title')}
               </h3>
               <button type="button" className="toast-card__close" onClick={() => setSelectedUser(null)}>
                 &times;
@@ -296,9 +296,9 @@ const UsersPage = () => {
                   <h2 style={{ fontSize: '1.25rem', color: 'var(--text-primary)' }}>{selectedUser.name}</h2>
                   <div style={{ marginTop: 4 }}>
                     {selectedUser.status === 'ACTIVE' ? (
-                      <span className="badge-status badge-status--active">Hoạt động</span>
+                      <span className="badge-status badge-status--active">{t('usersPage.status_active')}</span>
                     ) : (
-                      <span className="badge-status badge-status--blocked">Bị khóa</span>
+                      <span className="badge-status badge-status--blocked">{t('usersPage.status_blocked')}</span>
                     )}
                   </div>
                 </div>
@@ -317,7 +317,7 @@ const UsersPage = () => {
                     gap: 6,
                   }}
                 >
-                  <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>🔒 Lý do bị khóa:</strong>
+                  <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>{t('usersPage.block_reason_label')}</strong>
                   <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                     "{selectedUser.blockReason || 'Vi phạm điều khoản hệ thống'}"
                   </p>
@@ -331,7 +331,7 @@ const UsersPage = () => {
                         color: '#F5A623',
                       }}
                     >
-                      <strong style={{ fontSize: '0.85rem' }}>📢 Nội dung khiếu nại mở khóa từ người dùng:</strong>
+                      <strong style={{ fontSize: '0.85rem' }}>{t('usersPage.appeal_label')}</strong>
                       <p style={{ color: 'var(--text-primary)', fontStyle: 'italic', marginTop: 4, fontSize: '0.9rem' }}>
                         "{selectedUser.appealNote}"
                       </p>
@@ -353,25 +353,25 @@ const UsersPage = () => {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SỐ ĐIỆN THOẠI</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('usersPage.col_phone')}</div>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
                     {selectedUser.phone}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>EMAIL</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('usersPage.col_email')}</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                     {selectedUser.email}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SỐ ĐƠN ĐÃ ĐẶT</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('usersPage.col_orders_count')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 2 }}>
-                    {selectedUser.ordersCount} Đơn
+                    {selectedUser.ordersCount} {t('usersPage.orders_unit')}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TỔNG CHI TIÊU</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('usersPage.col_total_spent')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-blue)', marginTop: 2 }}>
                     {Number(selectedUser.totalSpent || 0).toLocaleString('vi-VN')} ₫
                   </div>
@@ -381,7 +381,7 @@ const UsersPage = () => {
               {/* Danh sách Đơn hàng gần đây */}
               <div>
                 <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Đơn Hàng Gần Đây
+                  {t('usersPage.recent_orders_title')}
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {selectedUser.recentOrders.map((ord, i) => (
@@ -420,17 +420,17 @@ const UsersPage = () => {
                       style={{ width: '100%', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
                       onClick={() => setShowReasonInput(true)}
                     >
-                      <HiOutlineLockClosed /> Khóa Tài Khoản Người Dùng
+                      <HiOutlineLockClosed /> {t('usersPage.btn_block')}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <label style={{ fontSize: '0.8rem', color: 'var(--accent-red)', fontWeight: 600 }}>
-                        Nhập lý do khóa tài khoản (bắt buộc):
+                        {t('usersPage.block_reason_input')}
                       </label>
                       <input
                         type="text"
                         className="location-input"
-                        placeholder="VD: Vi phạm điều khoản thanh toán, bom hàng..."
+                        placeholder={t('usersPage.block_reason_placeholder')}
                         value={blockReason}
                         onChange={(e) => setBlockReason(e.target.value)}
                         autoFocus
@@ -443,14 +443,14 @@ const UsersPage = () => {
                           disabled={processing}
                           onClick={handleConfirmBlock}
                         >
-                          Xác Nhận Khóa
+                          {t('usersPage.btn_confirm_block')}
                         </button>
                         <button
                           type="button"
                           className="btn btn--ghost"
                           onClick={() => setShowReasonInput(false)}
                         >
-                          Hủy
+                          {t('usersPage.btn_cancel')}
                         </button>
                       </div>
                     </div>
@@ -464,7 +464,7 @@ const UsersPage = () => {
                   disabled={processing}
                   onClick={() => handleUnblock(selectedUser)}
                 >
-                  <HiOutlineLockOpen /> Mở Khóa Tài Khoản
+                  <HiOutlineLockOpen /> {t('usersPage.btn_unblock')}
                 </button>
               )}
             </div>

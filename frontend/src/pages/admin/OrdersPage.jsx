@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   HiOutlineSearch,
   HiOutlineRefresh,
@@ -78,6 +79,7 @@ const getStatusInfo = (status) => {
 };
 
 const AdminOrdersPage = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const socket = useContext(SocketContext);
 
@@ -299,17 +301,15 @@ const AdminOrdersPage = () => {
       {/* Header Bar */}
       <div className="admin-header-bar">
         <div>
-          <h1 className="admin-title">Quản lý đơn hàng</h1>
-          <p className="admin-subtitle">
-            Real-time qua Socket.IO - Admin dispatch & confirm match
-          </p>
+          <h1 className="admin-title">{t('ordersPage.title')}</h1>
+          <p className="admin-subtitle">{t('ordersPage.subtitle')}</p>
         </div>
         <button
           type="button"
           className="orders-reload-btn"
           onClick={() => fetchOrders(page)}
         >
-          <HiOutlineRefresh style={{ fontSize: '1.1rem' }} /> Tải lại
+          <HiOutlineRefresh style={{ fontSize: '1.1rem' }} /> {t('ordersPage.btn_reload')}
         </button>
       </div>
 
@@ -319,7 +319,7 @@ const AdminOrdersPage = () => {
         <input
           type="text"
           className="orders-search-input"
-          placeholder="Tìm địa chỉ, khách hàng, tài xế, mã đơn (#)..."
+          placeholder={t('ordersPage.search_placeholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleSearchSubmit}
@@ -355,28 +355,28 @@ const AdminOrdersPage = () => {
           className={`orders-tab-btn ${statusFilter === 'ALL' ? 'orders-tab-btn--active' : ''}`}
           onClick={() => handleTabChange('ALL')}
         >
-          Tất cả {counts.all}
+          {t('ordersPage.tab_all')} {counts.all}
         </button>
         <button
           type="button"
           className={`orders-tab-btn ${statusFilter === 'PROCESSING' ? 'orders-tab-btn--active' : ''}`}
           onClick={() => handleTabChange('PROCESSING')}
         >
-          Đang xử lý {counts.processing}
+          {t('ordersPage.tab_processing')} {counts.processing}
         </button>
         <button
           type="button"
           className={`orders-tab-btn ${statusFilter === 'DELIVERED' ? 'orders-tab-btn--active' : ''}`}
           onClick={() => handleTabChange('DELIVERED')}
         >
-          Đã giao {counts.delivered}
+          {t('ordersPage.tab_delivered')} {counts.delivered}
         </button>
         <button
           type="button"
           className={`orders-tab-btn ${statusFilter === 'EXPIRED' ? 'orders-tab-btn--active' : ''}`}
           onClick={() => handleTabChange('EXPIRED')}
         >
-          Hết hạn {counts.expired}
+          {t('ordersPage.tab_expired')} {counts.expired}
         </button>
       </div>
 
@@ -384,8 +384,8 @@ const AdminOrdersPage = () => {
       {selectedOrderIds.length > 0 && (
         <div className="orders-bulk-action-bar">
           <div className="bulk-action-info">
-            <span className="bulk-action-badge">{selectedOrderIds.length}</span>
-            <span>Đơn hàng đã được chọn</span>
+            <span>{selectedOrderIds.length}</span>
+            <span>{t('ordersPage.bulk_selected')}</span>
           </div>
           <div className="bulk-action-buttons">
             <button
@@ -393,14 +393,14 @@ const AdminOrdersPage = () => {
               className="bulk-action-btn bulk-action-btn--cancel"
               onClick={handleClearSelection}
             >
-              Hủy chọn
+              {t('ordersPage.bulk_cancel')}
             </button>
             <button
               type="button"
               className="bulk-action-btn bulk-action-btn--delete"
               onClick={() => handleOpenDeleteModal(selectedOrderIds)}
             >
-              <HiOutlineTrash style={{ fontSize: '1.1rem' }} /> Xóa {selectedOrderIds.length} đơn hàng
+              <HiOutlineTrash style={{ fontSize: '1.1rem' }} /> {t('ordersPage.bulk_delete')} {selectedOrderIds.length} {t('ordersPage.bulk_delete_orders')}
             </button>
           </div>
         </div>
@@ -410,11 +410,11 @@ const AdminOrdersPage = () => {
       <div className="orders-table-card">
         {loading ? (
           <div style={{ textAlign: 'center', color: '#94a3b8', padding: '3rem' }}>
-            Đang tải dữ liệu đơn hàng...
+            {t('ordersPage.loading')}
           </div>
         ) : orders.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#94a3b8', padding: '3rem' }}>
-            Không có đơn hàng nào phù hợp với bộ lọc
+            {t('ordersPage.no_results')}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -432,11 +432,11 @@ const AdminOrdersPage = () => {
                       onChange={handleSelectAll}
                     />
                   </th>
-                  <th>TRẠNG THÁI</th>
-                  <th>KHÁCH HÀNG</th>
-                  <th>TUYẾN ĐƯỜNG</th>
-                  <th>GIÁ</th>
-                  <th>THỜI GIAN</th>
+                  <th>{t('ordersPage.col_status')}</th>
+                  <th>{t('ordersPage.col_customer')}</th>
+                  <th>{t('ordersPage.col_route')}</th>
+                  <th>{t('ordersPage.col_price')}</th>
+                  <th>{t('ordersPage.col_time')}</th>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
@@ -535,7 +535,7 @@ const AdminOrdersPage = () => {
                         <button
                           type="button"
                           className="orders-row-action-btn orders-row-action-btn--delete"
-                          title="Xóa đơn hàng này"
+                          title={t('ordersPage.delete_title')}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenDeleteModal([order.id]);
@@ -546,7 +546,7 @@ const AdminOrdersPage = () => {
                         <button
                           type="button"
                           className="orders-row-action-btn"
-                          title="Xem chi tiết"
+                          title={t('ordersPage.view_detail')}
                           onClick={() => setSelectedOrder(order)}
                         >
                           <HiChevronRight />
@@ -563,7 +563,7 @@ const AdminOrdersPage = () => {
         {/* Footer & Pagination */}
         <div className="orders-table-footer">
           <div className="orders-footer-info">
-            Hiển thị {orders.length} trên {total} đơn hàng
+            {t('ordersPage.footer_show')} {orders.length} {t('ordersPage.footer_of')} {total} {t('ordersPage.footer_orders')}
           </div>
 
           <div className="orders-pagination">
@@ -647,11 +647,9 @@ const AdminOrdersPage = () => {
                     fontWeight: 700,
                   }}
                 >
-                  Chi Tiết Đơn Hàng #{selectedOrder.id?.slice(-8).toUpperCase()}
+                  {t('ordersPage.modal_title')} #{selectedOrder.id?.slice(-8).toUpperCase()}
                 </h3>
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                  Thông tin vận chuyển thực thời trên SmartFleet
-                </span>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t('ordersPage.modal_subtitle')}</span>
               </div>
               <button
                 type="button"
@@ -681,7 +679,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>👤 Tên khách hàng:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{t('ordersPage.detail_customer')}</span>
                 <strong style={{ color: '#ffffff', fontSize: '0.9rem' }}>
                   {selectedOrder.customer?.fullName || selectedOrder.customerName || 'Chưa cập nhật'}
                 </strong>
@@ -698,7 +696,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🆔 OrderID:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{t('ordersPage.detail_order_id')}</span>
                 <strong style={{ color: '#ffffff', fontFamily: 'monospace', fontSize: '0.85rem' }}>
                   {selectedOrder.id}
                 </strong>
@@ -715,12 +713,12 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🚚 Tên Tài xế:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{t('ordersPage.detail_driver')}</span>
                 <strong style={{ color: selectedOrder.driver ? '#ffffff' : '#94a3b8', fontSize: '0.9rem' }}>
                   {selectedOrder.driver?.user?.fullName ||
                     selectedOrder.driver?.fullName ||
                     selectedOrder.driver?.name ||
-                    'Chưa gán tài xế'}
+                    t('ordersPage.no_driver')}
                 </strong>
               </div>
 
@@ -735,7 +733,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>🛵 Phương tiện:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{t('ordersPage.detail_vehicle')}</span>
                 <strong style={{ color: '#ffffff', fontSize: '0.9rem' }}>
                   {selectedOrder.driver?.vehicleType || selectedOrder.vehicleType || 'Xe Máy Express'}
                 </strong>
@@ -753,7 +751,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>📍 Điểm đón:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{t('ordersPage.detail_pickup')}</span>
                 <strong style={{ color: '#10b981', fontSize: '0.88rem' }}>
                   {selectedOrder.pickupAddress || 'Chưa cập nhật'}
                 </strong>
@@ -771,7 +769,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>🏁 Điểm đến:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{t('ordersPage.detail_dropoff')}</span>
                 <strong style={{ color: '#3b82f6', fontSize: '0.88rem' }}>
                   {selectedOrder.dropoffAddress || 'Chưa cập nhật'}
                 </strong>
@@ -788,7 +786,7 @@ const AdminOrdersPage = () => {
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>⏰ Thời gian:</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{t('ordersPage.detail_time')}</span>
                 <strong style={{ color: '#ffffff', fontSize: '0.88rem' }}>
                   {selectedOrder.createdAt
                     ? new Date(selectedOrder.createdAt).toLocaleString('vi-VN')

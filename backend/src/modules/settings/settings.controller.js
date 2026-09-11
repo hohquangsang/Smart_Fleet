@@ -1,5 +1,6 @@
 import * as settingsService from './settings.service.js';
 import catchAsync from '../../utils/catch-async.js';
+import { emitMaintenanceMode } from '../../sockets/socket.gateway.js';
 
 // ─── Profile ────────────────────────────────────────────────────────────────
 export const getProfile = catchAsync(async (req, res) => {
@@ -30,6 +31,27 @@ export const uploadAvatar = catchAsync(async (req, res) => {
   }
   const profile = await settingsService.updateAdminAvatar(req.user.id, avatarBase64);
   res.status(200).json({ success: true, data: { avatarUrl: profile.avatar, profile } });
+});
+
+// ─── Maintenance Mode ──────────────────────────────────────────────────────────
+export const getMaintenance = catchAsync(async (_req, res) => {
+  const result = await settingsService.getMaintenanceMode();
+  res.status(200).json({ success: true, data: result });
+});
+
+export const setMaintenance = catchAsync(async (req, res) => {
+  const { enabled, message } = req.body;
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ success: false, error: { message: 'enabled must be boolean' } });
+  }
+  const result = await settingsService.setMaintenanceMode(enabled, message, req.user.id);
+  // Broadcast to all connected users/drivers via socket
+  emitMaintenanceMode(result.enabled, result.message);
+  res.status(200).json({
+    success: true,
+    message: enabled ? 'Bật chế độ bảo trì thành công' : 'Tắt chế độ bảo trì',
+    data: result,
+  });
 });
 
 // ─── System Config ──────────────────────────────────────────────────────────

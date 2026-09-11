@@ -1,5 +1,7 @@
+import axios from 'axios';
 import api from './api';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 const BASE = '/admin/settings';
 
 export const settingsApi = {
@@ -19,8 +21,13 @@ export const settingsApi = {
   }),
 
   // System Config
-  getConfig:       () => api.get(`${BASE}/config`),
-  updateConfig:    (updates) => api.patch(`${BASE}/config`, { updates }),
+  getConfig:            () => api.get(`${BASE}/config`),
+  updateConfig:         (updates) => api.patch(`${BASE}/config`, { updates }),
+
+  // Maintenance Mode
+  getPublicMaintenance: () => axios.get(`${API_URL}/admin/settings/public-maintenance`),
+  getMaintenance:       () => api.get(`${BASE}/maintenance`),
+  setMaintenance:       (enabled, message) => api.patch(`${BASE}/maintenance`, { enabled, message }),
 
   // Admin Accounts
   getAdmins:       () => api.get(`${BASE}/admins`),

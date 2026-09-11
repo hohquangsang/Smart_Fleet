@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   HiOutlineUser,
   HiOutlineCog,
@@ -13,54 +14,56 @@ import AuditLogTab     from './settings/AuditLogTab';
 import SmtpTab         from './settings/SmtpTab';
 import '../../styles/settings.css';
 
-const TABS = [
-  {
-    id: 'profile',
-    label: 'Hồ Sơ',
-    icon: <HiOutlineUser />,
-    desc: 'Thông tin cá nhân & mật khẩu',
-    component: ProfileTab,
-  },
-  {
-    id: 'system',
-    label: 'Hệ Thống',
-    icon: <HiOutlineCog />,
-    desc: 'Cài đặt chung, thông báo & phiên bản app',
-    component: SystemConfigTab,
-  },
-  {
-    id: 'accounts',
-    label: 'Tài Khoản',
-    icon: <HiOutlineUsers />,
-    desc: 'Quản lý tài khoản admin',
-    component: AccountsTab,
-  },
-  {
-    id: 'audit-log',
-    label: 'Nhật Ký',
-    icon: <HiOutlineClipboardList />,
-    desc: 'Lịch sử hoạt động hệ thống',
-    component: AuditLogTab,
-  },
-  {
-    id: 'smtp',
-    label: 'Email',
-    icon: <HiOutlineMail />,
-    desc: 'Cấu hình SMTP & thông báo',
-    component: SmtpTab,
-  },
-];
-
 const SettingsPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('profile');
-  const current = TABS.find((t) => t.id === activeTab);
+
+  const TABS = [
+    {
+      id: 'profile',
+      label: t('settings.tabs.profile'),
+      icon: <HiOutlineUser />,
+      desc: t('settings.tabs.profile_desc'),
+      component: ProfileTab,
+    },
+    {
+      id: 'system',
+      label: t('settings.tabs.system'),
+      icon: <HiOutlineCog />,
+      desc: t('settings.tabs.system_desc'),
+      component: SystemConfigTab,
+    },
+    {
+      id: 'accounts',
+      label: t('settings.tabs.accounts'),
+      icon: <HiOutlineUsers />,
+      desc: t('settings.tabs.accounts_desc'),
+      component: AccountsTab,
+    },
+    {
+      id: 'audit-log',
+      label: t('settings.tabs.audit_log'),
+      icon: <HiOutlineClipboardList />,
+      desc: t('settings.tabs.audit_log_desc'),
+      component: AuditLogTab,
+    },
+    {
+      id: 'smtp',
+      label: t('settings.tabs.email'),
+      icon: <HiOutlineMail />,
+      desc: t('settings.tabs.email_desc'),
+      component: SmtpTab,
+    },
+  ];
+
+  const current = TABS.find((tab) => tab.id === activeTab);
   const ActiveComponent = current?.component;
 
   return (
     <div className="settings-page">
       {/* ── Left Navigation ── */}
       <nav className="settings-nav">
-        <div className="settings-nav__title">Cài đặt</div>
+        <div className="settings-nav__title">{t('settings.nav_title')}</div>
 
         {TABS.slice(0, 1).map((tab) => (
           <button
@@ -75,7 +78,9 @@ const SettingsPage = () => {
         ))}
 
         <div className="settings-nav__separator" />
-        <div className="settings-nav__title" style={{ marginTop: 4 }}>Quản Trị</div>
+        <div className="settings-nav__title" style={{ marginTop: 4 }}>
+          {t('settings.admin_section')}
+        </div>
 
         {TABS.slice(1, 4).map((tab) => (
           <button
@@ -90,7 +95,9 @@ const SettingsPage = () => {
         ))}
 
         <div className="settings-nav__separator" />
-        <div className="settings-nav__title" style={{ marginTop: 4 }}>Liên Lạc</div>
+        <div className="settings-nav__title" style={{ marginTop: 4 }}>
+          {t('settings.contact_section')}
+        </div>
 
         {TABS.slice(4).map((tab) => (
           <button
@@ -107,7 +114,6 @@ const SettingsPage = () => {
 
       {/* ── Main Content ── */}
       <div className="settings-content">
-        {/* Tab Content */}
         {ActiveComponent && <ActiveComponent />}
       </div>
     </div>
