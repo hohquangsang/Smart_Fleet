@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,22 +7,33 @@ from .routers import eta, route
 from .models.schemas import HealthResponse
 from .services.eta_predictor import eta_predictor
 
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+# ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="SmartFleet AI Service",
     description="AI microservice for ETA prediction and route optimization",
     version="1.0.0",
 )
 
-# CORS
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# In production set ALLOWED_ORIGINS in .env, e.g.:
+#   ALLOWED_ORIGINS=https://smartfleet.example.com,https://admin.example.com
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(eta.router, prefix="/api", tags=["ETA Prediction"])
 app.include_router(route.router, prefix="/api", tags=["Route Optimization"])
 

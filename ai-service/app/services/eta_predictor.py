@@ -1,8 +1,12 @@
 import os
+import logging
 import joblib
 import numpy as np
+from fastapi import HTTPException
 from ..config import settings
 from ..utils.feature_engineering import extract_features, get_traffic_factors
+
+logger = logging.getLogger(__name__)
 
 
 class ETAPredictor:
@@ -10,6 +14,7 @@ class ETAPredictor:
 
     def __init__(self):
         self.model = None
+        self._model_confidence_base = 0.80  # Calibrated offline; update after retraining
         self._load_model()
 
     def _load_model(self):
@@ -18,10 +23,12 @@ class ETAPredictor:
 
         if os.path.exists(model_path):
             self.model = joblib.load(model_path)
-            print(f"✅ XGBoost model loaded from {model_path}")
+            logger.info("XGBoost model loaded from %s", model_path)
         else:
             self.model = None
-            print(f"⚠️  No trained model found at {model_path}. Using rule-based fallback.")
+            logger.warning(
+                "No trained model found at %s. Using rule-based fallback.", model_path
+            )
 
     def predict(self, data: dict) -> dict:
         """
@@ -30,44 +37,73 @@ class ETAPredictor:
         Returns:
             dict with ai_eta_min, confidence, and factors
         """
-        factors = get_traffic_factors(data)
+        try:
+            factors = get_traffic_factors(data)
 
-        if self.model is not None:
-            # Use trained model
-            features = extract_features(data)
-            prediction = self.model.predict(features)[0]
-            ai_eta_min = max(1, int(round(prediction)))
+            if self.model is not None:
+                result = self._model_prediction(data, factors)
+            else:
+                result = self._rule_based_prediction(data, factors)
 
-            return {
-                "ai_eta_min": ai_eta_min,
-                "confidence": 0.85,
-                "factors": factors,
-            }
-        else:
-            # Rule-based fallback
-            return self._rule_based_prediction(data, factors)
+            logger.info(
+                "ETA predicted | order=%s distance=%.2fkm hour=%d day=%d "
+                "vehicle=%s → %d min (conf=%.2f)",
+                data.get("order_id", "N/A"),
+                data.get("distance_km", 0),
+                data.get("hour_of_day", 0),
+                data.get("day_of_week", 0),
+                data.get("vehicle_type", "unknown"),
+                result["ai_eta_min"],
+                result["confidence"],
+            )
+            return result
+
+        except Exception as exc:
+            logger.exception("ETA prediction failed for order %s", data.get("order_id"))
+            raise HTTPException(status_code=500, detail=f"ETA prediction error: {exc}") from exc
+
+    def _model_prediction(self, data: dict, factors: dict) -> dict:
+        """Run XGBoost inference and compute dynamic confidence."""
+        features = extract_features(data)
+        raw = self.model.predict(features)[0]
+        ai_eta_min = max(1, int(round(raw)))
+
+        # Dynamic confidence: penalise high detour ratios (unreliable routes)
+        detour_ratio = features[0, 7]  # index 7 = detour_ratio
+        confidence = round(
+            max(0.50, min(0.95, self._model_confidence_base - 0.05 * (detour_ratio - 1))),
+            2,
+        )
+
+        return {
+            "ai_eta_min": ai_eta_min,
+            "confidence": confidence,
+            "factors": factors,
+        }
 
     def _rule_based_prediction(self, data: dict, factors: dict) -> dict:
         """
         Simple rule-based ETA prediction when no ML model is available.
         Adjusts base ETA based on time of day, day of week, and vehicle type.
+
+        Convention: day_of_week follows Python datetime.weekday() — Mon=0, Sun=6.
         """
         base_eta = data["base_eta_min"]
         hour = data["hour_of_day"]
-        day = data["day_of_week"]
+        day = data["day_of_week"]  # Mon=0 … Sun=6
 
         multiplier = 1.0
 
         # Rush hour adjustment
         if 7 <= hour <= 9:
-            multiplier += 0.25
+            multiplier += 0.25   # +25% morning rush
         elif 17 <= hour <= 19:
-            multiplier += 0.35
-        elif 22 <= hour or hour <= 5:
-            multiplier -= 0.15
+            multiplier += 0.35   # +35% evening rush
+        elif hour >= 22 or hour <= 5:
+            multiplier -= 0.15   # -15% late night
 
-        # Weekend adjustment
-        if day in [0, 6]:
+        # Weekend adjustment — Saturday=5, Sunday=6 (Python weekday)
+        if day in [5, 6]:
             multiplier -= 0.10
 
         # Vehicle type adjustment

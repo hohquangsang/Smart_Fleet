@@ -38,7 +38,7 @@ const errorMiddleware = (err, _req, res, _next) => {
 
   // Log unexpected errors
   if (!isOperational) {
-    console.error('💥 UNEXPECTED ERROR:', err);
+    console.error('UNEXPECTED ERROR:', err);
   }
 
   res.status(statusCode).json({

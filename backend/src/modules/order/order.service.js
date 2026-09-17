@@ -46,6 +46,7 @@ export const createOrder = async (customerId, data) => {
     pickupLng,
     dropoffLat,
     dropoffLng,
+    vehicleType,              // ← pass vehicleType so AI uses correct vehicle factor
   });
 
   // 3. Calculate fare
