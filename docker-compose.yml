@@ -1,0 +1,116 @@
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: smart_fleet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: bun123
+      POSTGRES_DB: smart_fleet_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Nạp SQL schema khi khởi tạo lần đầu
+      - ./smart_fleet_db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - smart_fleet_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: smart_fleet_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - smart_fleet_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── AI Service (FastAPI / Python) ────────────────────────────────────────────
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: smart_fleet_ai
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      LOG_LEVEL: INFO
+      # Cho phép backend gọi sang AI service
+      ALLOWED_ORIGINS: "http://localhost:3000,http://backend:3000"
+    ports:
+      - "8000:8000"
+    networks:
+      - smart_fleet_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (Node.js / Express + Prisma) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart_fleet_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override các biến kết nối để dùng service name thay vì localhost
+      DATABASE_URL: postgresql://postgres:bun123@postgres:5432/smart_fleet_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AI_SERVICE_URL: http://ai-service:8000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    networks:
+      - smart_fleet_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
+  # ── Frontend (React + Vite → Nginx) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smart_fleet_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - smart_fleet_net
+    depends_on:
+      - backend
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  smart_fleet_net:
+    driver: bridge
